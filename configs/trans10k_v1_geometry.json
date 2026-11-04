@@ -1,0 +1,277 @@
+{
+  "schema": 1,
+  "source": "Official Trans10K v1 archives",
+  "scope": "18 training masks only; validation/test unchanged",
+  "corrections": {
+    "train/images/150.jpg": {
+      "image_sha256": "e2cf80e931548921f0b4de9ff47a6fc48d0aeb21b20f392965d8fb14656800bb",
+      "mask_sha256": "1f993566737f9a4b0fd867793d74e0a6ef1bb1c4ce4b90ac6ac82427dc5c86a1",
+      "image_size": [
+        4032,
+        3024
+      ],
+      "mask_size": [
+        3024,
+        4032
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/1519.jpg": {
+      "image_sha256": "62c73d0c75b29a953de27b89f6ebb4ece04b3150c68dfc6d1124f96400d2a5c7",
+      "mask_sha256": "e93e10d26566659b962bf0287999574b4cb3d2f2217adb265fe1e629795ff5e2",
+      "image_size": [
+        3000,
+        4000
+      ],
+      "mask_size": [
+        4000,
+        3000
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/1544.jpg": {
+      "image_sha256": "ea197f98f2ef682710223d05e5e64fb65e410f33ead3071f9288c983b347d643",
+      "mask_sha256": "fa440dc8482b05bbb2b075c9d2cf9d66f8f1c5e2653b1da3779cef8dc9bcf1ee",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/1557.jpg": {
+      "image_sha256": "aff6d859920730782665c0589e98e921f16087546ac6b76421e795573efddfaf",
+      "mask_sha256": "cc402523d0717597185088203ac10efac2231fe5fe9d9c81a81e79ee41d999d0",
+      "image_size": [
+        3456,
+        4608
+      ],
+      "mask_size": [
+        4608,
+        3456
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/2511.jpg": {
+      "image_sha256": "b9aa64988a7c55230cd3d96d01b6d67682ab284c8b41a833fa38689b1325ec59",
+      "mask_sha256": "25426cb23d1c0e47d204a88da2ca7cde7818e1d2689ec30073f5cc982bee3fa3",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/2538.jpg": {
+      "image_sha256": "944eb95e08d1856fb61478558c7d49f590ed8c00eb8aae7902957d32a158dc2f",
+      "mask_sha256": "aba75c264c834570a45ed3cc19bba4fdb5e1e7ee489ed61e087cfbc477ef6d5b",
+      "image_size": [
+        3456,
+        4608
+      ],
+      "mask_size": [
+        4608,
+        3456
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_01.jpg"
+    },
+    "train/images/2545.jpg": {
+      "image_sha256": "efdb9e19bc37458a5e9c1759a12a1d9adef724a645a761f145e14092e03def1b",
+      "mask_sha256": "52a4b177cd21834aa76797af949425fca5ba22fa9d19d660cfc19b6499e2e9cf",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/2642.jpg": {
+      "image_sha256": "c669e870a8645c24a902d74bbec6001f3582b9bdc5c76e75a66fb7c0e5bff716",
+      "mask_sha256": "b32022d8ef5d306f236847c2efc7b4e4ed687bd53d8a5d8758ff2735bef491e9",
+      "image_size": [
+        3456,
+        4608
+      ],
+      "mask_size": [
+        4608,
+        3456
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/2672.jpg": {
+      "image_sha256": "c9536b2bdfeb619543ddc1dbb5ffcf2daa8ae7bb6e5497fb0be41b2bbee8690d",
+      "mask_sha256": "f9dad89ab0e44d344c2cd15da38a4df022727aa568de029a7b4a8714c3e94dae",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/2706.jpg": {
+      "image_sha256": "290af67b24872879202260047c06bf2c6e018d237ad71bef2264d565468b98e5",
+      "mask_sha256": "e22ab6df811f2886755f467cc5bbf1f371a3f2b2e40cfb80da5b1306fb1ebcae",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/2707.jpg": {
+      "image_sha256": "814ccf2054e9bef07841684c9203ea9c78efe4a54e21575c5a3ff853dcaf2818",
+      "mask_sha256": "a99ebb08eb0f601131f2803e6d1ec53a6b6cfbf17ddeb1b7310024fb4580489b",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/3703.jpg": {
+      "image_sha256": "6f6ace6393c32e36fd204143d2488bbde3a853b04d2aaa5e7a765a13f037fc2f",
+      "mask_sha256": "a63c022836bd0c37f05a4c4f72735154a798ade9fcfcaeec16f0065843ec9ef6",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_02.jpg"
+    },
+    "train/images/3751.jpg": {
+      "image_sha256": "b43481b5fb1c3491d84bb5eae7a90c5a0257685fabf947511c31b6a711dbc3a0",
+      "mask_sha256": "8be9e4f89673d2da7df3defa6adb59af0bd44af2001b49b6de1427efcc18101e",
+      "image_size": [
+        4032,
+        3024
+      ],
+      "mask_size": [
+        3024,
+        4032
+      ],
+      "mask_rotation_cw": 270,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    },
+    "train/images/3788.jpg": {
+      "image_sha256": "770e6b5e659afabd2d7cc5f3ae1f31c1d04950a62fe5478d8c4efca7c699f9aa",
+      "mask_sha256": "c3368e3f824aa89ab5ba71e4fffb31865a5d143a20af517b4903b100b7391d8c",
+      "image_size": [
+        4032,
+        3024
+      ],
+      "mask_size": [
+        3024,
+        4032
+      ],
+      "mask_rotation_cw": 270,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    },
+    "train/images/3808.jpg": {
+      "image_sha256": "fb71a7d8c916904c62bd2ba1c059ad14a7761e62e855a7cc344d248bb5d2d76e",
+      "mask_sha256": "30c3ac1f8e417ec2579243038cfb71142ffd5f049780ec12b292a53a5867fdd0",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    },
+    "train/images/467.jpg": {
+      "image_sha256": "ec0f4c945b27a658ab8e86eafdd4e0ded12d66277132b25e6adb4dc0c9a63425",
+      "mask_sha256": "0d3fef64bdd484fb7fc3dc3c51fbc2ec9533a4c1aa7da85947a043c4729011c7",
+      "image_size": [
+        3456,
+        4608
+      ],
+      "mask_size": [
+        4608,
+        3456
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    },
+    "train/images/964.jpg": {
+      "image_sha256": "8c28d2effa5f5948f12fe1c37f11bc7a46ed2b8f8009b1eb2d34dfabb56ca64e",
+      "mask_sha256": "a3cd68fe7a5b61f52b5d831242cec26bd92eb2fc54a1c25666323454f85e08f5",
+      "image_size": [
+        3456,
+        4608
+      ],
+      "mask_size": [
+        4608,
+        3456
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    },
+    "train/images/981.jpg": {
+      "image_sha256": "6b21ad633e964710be944456029cedc49437b49761715a04cf22c6ef76729d0d",
+      "mask_sha256": "d37d227621c182b382782ed70aa191521dc92fb772e45baa96c28e20d09ac819",
+      "image_size": [
+        3024,
+        4032
+      ],
+      "mask_size": [
+        4032,
+        3024
+      ],
+      "mask_rotation_cw": 90,
+      "reviewed": true,
+      "evidence": "results/geometry_review_03.jpg"
+    }
+  }
+}

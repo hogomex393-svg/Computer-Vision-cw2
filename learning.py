@@ -58,17 +58,15 @@ def restore_model(path, device='cpu'):
     return model.to(device).eval(), checkpoint
 
 
-def evaluate(model, root, manifest, config, device, corruption='clean', preview=None, max_samples=0):
-    data = SegmentationData(root, manifest, config['size'])
+def evaluate(model, root, manifest, config, device, corruption='clean', preview=None, max_samples=0, cache=None):
+    data = SegmentationData(root, manifest, config['size'], seed=config['seed'], mean=config.get('mean'), std=config.get('std'), cache=cache)
     metrics = Metrics(config['boundary_tolerance'])
     per_image = []
     was_training = model.training
     model.eval()
     with torch.no_grad():
         for i in range(min(len(data), max_samples) if max_samples else len(data)):
-            rgb, target = data.original(i)
-            image = corrupt(rgb, corruption, config['seed'] + i)
-            tensor, meta = preprocess(image, config['size'], config.get('mean', MEAN), config.get('std', STD))
+            tensor, meta, target = data.evaluation_item(i, corruption)
             logits = model(torch.from_numpy(tensor).to(device))['logits'].float().cpu().numpy()
             prediction = restore_logits(logits, meta).argmax(-1).astype(np.uint8)
             metrics.update(prediction, target)
@@ -76,13 +74,15 @@ def evaluate(model, root, manifest, config, device, corruption='clean', preview=
             single.update(prediction, target)
             per_image.append({'image': data.records[i]['image'], 'miou': single.result()['miou']})
             if preview and i < 4:
+                rgb, _ = data.original(i)
                 preview = Path(preview)
                 preview.mkdir(parents=True, exist_ok=True)
                 Image.fromarray(np.concatenate([rgb, overlay(rgb, target), overlay(rgb, prediction)], axis=1)).save(preview / ('{:03}.png'.format(i)))
     model.train(was_training)
     result = metrics.result()
     result.update({'samples': len(per_image), 'corruption': corruption, 'seed': config['seed'],
-                   'dataset_source': data.manifest['source'], 'split': data.manifest['split'], 'per_image': per_image})
+                   'dataset_source': data.manifest['source'], 'split': data.manifest['split'], 'per_image': per_image,
+                   'manifest_sha256': sha256(manifest)})
     return result
 
 
@@ -95,15 +95,15 @@ def renormalize(image, source, target):
 
 
 def train(config, root, manifests, out, device='auto', resume=False, teacher_path=None, baseline_path=None,
-          stop_after_epoch=0, max_train_steps=0, cache=None):
+          stop_after_epoch=0, max_train_steps=0, cache=None, validation_cache=None):
     Path(out).mkdir(parents=True, exist_ok=True)
     with FileLock(str(Path(out) / '.train.lock'), timeout=0):
         return _train(config, root, manifests, out, device, resume, teacher_path, baseline_path,
-                      stop_after_epoch, max_train_steps, cache)
+                      stop_after_epoch, max_train_steps, cache, validation_cache)
 
 
 def _train(config, root, manifests, out, device='auto', resume=False, teacher_path=None, baseline_path=None,
-           stop_after_epoch=0, max_train_steps=0, cache=None):
+           stop_after_epoch=0, max_train_steps=0, cache=None, validation_cache=None):
     out, manifests = Path(out), Path(manifests)
     out.mkdir(parents=True, exist_ok=True)
     if device == 'auto':
@@ -213,7 +213,7 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
                 if max_train_steps and index + 1 >= max_train_steps:
                     break
             scheduler.step()
-            validation = evaluate(model, root, val_manifest, config, device)
+            validation = evaluate(model, root, val_manifest, config, device, cache=validation_cache)
             score = validation['miou']
             if score is None:
                 raise ValueError('Validation contains no valid pixels')
@@ -235,6 +235,8 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
                      'epoch_seconds': time.perf_counter() - epoch_start_time, 'lr_next': scheduler.get_last_lr()[0]}
             with (out / 'epochs.jsonl').open('a', encoding='utf-8') as log:
                 log.write(json.dumps(entry) + '\n')
+            run.update(last_completed_epoch=epoch + 1, global_step=step, best_miou=best)
+            write_json(out / 'run.json', run)
             print(json.dumps(entry), flush=True)
             if stop_after_epoch and epoch + 1 >= stop_after_epoch and epoch + 1 < config['epochs']:
                 run['status'] = 'interrupted_at_epoch_boundary'

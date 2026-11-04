@@ -1,5 +1,7 @@
 import hashlib
+import inspect
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
@@ -7,10 +9,16 @@ import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
+from filelock import FileLock
 
-from runtime import letterbox, normalize, overlay
+from runtime import letterbox, normalize, overlay, preprocess
+from metrics import corrupt
 
 LABELS = ['background', 'transparent_thing', 'transparent_stuff']
+
+
+def cache_protocol():
+    return hashlib.sha256((inspect.getsource(letterbox) + inspect.getsource(corrupt)).encode()).hexdigest()
 
 
 def load_mask(path, encoding):
@@ -49,71 +57,140 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def audit(root, out, encoding, official=True):
+def audit_sample(job):
+    image_path, mask_path, location, mask_location, encoding, correction, signature, preview = job
+    result = {'image': location, 'signature': signature}
+    try:
+        if correction:
+            if not correction.get('reviewed') or correction['mask_rotation_cw'] not in (0, 90, 180, 270):
+                raise ValueError('Geometry correction is not reviewed/valid')
+            if sha256(image_path) != correction['image_sha256'] or sha256(mask_path) != correction['mask_sha256']:
+                raise ValueError('Geometry correction SHA256 mismatch')
+        with Image.open(image_path) as image:
+            image.load()
+            rgb = np.asarray(image.convert('RGB'))
+        with Image.open(mask_path) as raw:
+            raw.load()
+            colored = raw.convert('RGB') if encoding == 'trans10k_v1' else raw
+            colors = colored.getcolors(1024)
+            if colors is not None:
+                unique = [list(value) if isinstance(value, tuple) else value for _, value in colors]
+            else:
+                arr = np.asarray(colored)
+                unique = np.unique(arr.reshape(-1, 3), axis=0).tolist() if arr.ndim == 3 else np.unique(arr).tolist()
+            mask = decode_mask_image(raw, encoding, mask_location)
+        rotation = correction.get('mask_rotation_cw', 0)
+        raw_shape = list(mask.shape)
+        if rotation:
+            mask = np.rot90(mask, -(rotation // 90)).copy()
+        if rgb.shape[:2] != mask.shape:
+            raise ValueError('Image/mask dimensions differ: {} vs {}'.format(rgb.shape[:2], mask.shape))
+        h = hashlib.sha256()
+        h.update(rgb.data)
+        h.update(str(rgb.shape).encode())
+        record = {'image': location, 'mask': mask_location, 'height': rgb.shape[0], 'width': rgb.shape[1],
+                  'decoded_sha256': h.hexdigest(), 'group': location.rsplit('/', 2)[0],
+                  'raw_mask_shape': raw_shape, 'mask_rotation_cw': rotation}
+        result.update(record=record, colors=unique,
+                      pixels=np.bincount(mask.ravel(), minlength=256)[[0, 1, 2, 255]].tolist())
+        if preview:
+            figure = Image.fromarray(np.concatenate([rgb, overlay(rgb, mask)], axis=1))
+            figure.thumbnail((1200, 700))
+            figure.save(preview)
+    except (ValueError, OSError, Image.DecompressionBombError) as error:
+        result['error'] = '{}: {}'.format(location, error)
+    return result
+
+
+def audit(root, out, encoding, official=True, geometry_overrides=None, workers=4):
+    Path(out).mkdir(parents=True, exist_ok=True)
+    with FileLock(str(Path(out) / '.audit.lock'), timeout=0):
+        return _audit(root, out, encoding, official, geometry_overrides, workers)
+
+
+def _audit(root, out, encoding, official=True, geometry_overrides=None, workers=4):
     root, out = Path(root).resolve(), Path(out)
     out.mkdir(parents=True, exist_ok=True)
+    corrections = json.loads(Path(geometry_overrides).read_text())['corrections'] if geometry_overrides else {}
+    journal_path = out / 'audit_rows.jsonl'
+    previous = {}
+    if journal_path.exists():
+        lines = journal_path.read_text(encoding='utf-8').splitlines()
+        for index, line in enumerate(lines):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+                previous[row['image']] = row
+            except json.JSONDecodeError:
+                if index != len(lines) - 1:
+                    raise ValueError('Audit journal is corrupted before its final line')
+                journal_path.write_text('\n'.join(lines[:index]) + '\n', encoding='utf-8')
+        if journal_path.stat().st_size:
+            with journal_path.open('rb') as handle:
+                handle.seek(-1, 2)
+                needs_newline = handle.read(1) != b'\n'
+            if needs_newline:
+                with journal_path.open('ab') as handle:
+                    handle.write(b'\n')
+    protocol = hashlib.sha256((inspect.getsource(decode_mask_image) + inspect.getsource(audit_sample)).encode()).hexdigest()
     errors, duplicate_groups, all_hashes, splits = [], [], {}, {}
     values, pixel_counts, dimensions = {}, np.zeros(4, dtype=np.int64), {}
-    for split in ('train', 'validation', 'test'):
-        split_root = root / split
-        records = []
-        image_dirs = sorted(p for p in split_root.rglob('images') if p.is_dir())
-        if not image_dirs:
-            errors.append('Missing images directory: ' + split)
-        for directory in image_dirs:
-            mask_dir = directory.parent / 'masks'
-            used_masks = set()
-            for image_path in sorted(directory.iterdir()):
-                if not image_path.is_file():
-                    continue
-                candidates = [mask_dir / (image_path.stem + '_mask.png'), mask_dir / (image_path.stem + '.png')]
-                found = [p for p in candidates if p.is_file()]
-                if len(found) != 1:
-                    errors.append('Missing/ambiguous mask: ' + str(image_path.relative_to(root)))
-                    continue
-                mask_path = found[0]
-                used_masks.add(mask_path)
-                try:
-                    with Image.open(image_path) as image:
-                        image.load()
-                        rgb = np.asarray(image.convert('RGB'))
-                    with Image.open(mask_path) as raw:
-                        raw.load()
-                        colored = raw.convert('RGB') if encoding == 'trans10k_v1' else raw
-                        colors = colored.getcolors(1024)
-                        if colors is not None:
-                            unique = [list(value) if isinstance(value, tuple) else value for _, value in colors]
-                        else:
-                            arr = np.asarray(colored)
-                            unique = np.unique(arr.reshape(-1, 3), axis=0).tolist() if arr.ndim == 3 else np.unique(arr).tolist()
-                        for v in unique:
-                            key = str(v)
-                            values[key] = values.get(key, 0) + 1
-                        mask = decode_mask_image(raw, encoding, str(mask_path))
-                    if rgb.shape[:2] != mask.shape:
-                        raise ValueError('Image/mask dimensions differ')
-                    for i, c in enumerate((0, 1, 2, 255)):
-                        pixel_counts[i] += (mask == c).sum()
-                    dim = '{}x{}'.format(rgb.shape[1], rgb.shape[0])
-                    dimensions[dim] = dimensions.get(dim, 0) + 1
-                    digest = hashlib.sha256(rgb.tobytes() + str(rgb.shape).encode()).hexdigest()
-                    location = str(image_path.relative_to(root)).replace('\\', '/')
-                    all_hashes.setdefault(digest, []).append({'split': split, 'image': location})
-                    record = {'image': location, 'mask': str(mask_path.relative_to(root)).replace('\\', '/'),
-                              'height': rgb.shape[0], 'width': rgb.shape[1], 'decoded_sha256': digest,
-                              'group': location.rsplit('/', 2)[0]}
+    reused = 0
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, 8))) as pool, journal_path.open('a', encoding='utf-8') as journal:
+        for split in ('train', 'validation', 'test'):
+            jobs, records = [], []
+            image_dirs = sorted(p for p in (root / split).rglob('images') if p.is_dir())
+            if not image_dirs:
+                errors.append('Missing images directory: ' + split)
+            for directory in image_dirs:
+                mask_dir, used_masks = directory.parent / 'masks', set()
+                for image_path in sorted(directory.iterdir()):
+                    if not image_path.is_file():
+                        continue
+                    found = [p for p in (mask_dir / (image_path.stem + '_mask.png'), mask_dir / (image_path.stem + '.png')) if p.is_file()]
+                    if len(found) != 1:
+                        errors.append('Missing/ambiguous mask: ' + str(image_path.relative_to(root)))
+                        continue
+                    mask_path = found[0]
+                    used_masks.add(mask_path)
+                    location = image_path.relative_to(root).as_posix()
+                    correction = corrections.get(location, {})
+                    signature = [image_path.stat().st_size, image_path.stat().st_mtime_ns,
+                                 mask_path.stat().st_size, mask_path.stat().st_mtime_ns, encoding, correction, protocol]
+                    preview = out / ('audit_{}_{}.png'.format(split, len(jobs) + 1)) if len(jobs) < 2 else None
+                    jobs.append((image_path, mask_path, location, mask_path.relative_to(root).as_posix(), encoding, correction, signature, preview))
+                if mask_dir.exists():
+                    for unused in set(p for p in mask_dir.iterdir() if p.is_file()) - used_masks:
+                        errors.append('Unpaired mask: ' + str(unused.relative_to(root)))
+            def checked(job):
+                cached = previous.get(job[2])
+                if cached and cached['signature'] == job[6]:
+                    return dict(cached, reused=True)
+                return audit_sample(job)
+            for index, row in enumerate(pool.map(checked, jobs)):
+                if row.get('reused'):
+                    reused += 1
+                else:
+                    journal.write(json.dumps(row) + '\n')
+                if 'error' in row:
+                    errors.append(row['error'])
+                else:
+                    record = row['record']
                     records.append(record)
-                    if len(records) % 100 == 0:
-                        (out / 'audit_progress.json').write_text(json.dumps({'split': split, 'processed': len(records), 'errors': len(errors)}), encoding='utf-8')
-                    if len(records) <= 2:
-                        preview = np.concatenate([rgb, overlay(rgb, mask)], axis=1)
-                        Image.fromarray(preview).save(out / ('audit_{}_{}.png'.format(split, len(records))))
-                except (ValueError, OSError) as error:
-                    errors.append('{}: {}'.format(image_path, error))
-            if mask_dir.exists():
-                for unused in set(p for p in mask_dir.iterdir() if p.is_file()) - used_masks:
-                    errors.append('Unpaired mask: ' + str(unused.relative_to(root)))
-        splits[split] = records
+                    pixel_counts += np.asarray(row['pixels'], np.int64)
+                    for value in row['colors']:
+                        key = str(value)
+                        values[key] = values.get(key, 0) + 1
+                    dim = '{}x{}'.format(record['width'], record['height'])
+                    dimensions[dim] = dimensions.get(dim, 0) + 1
+                    all_hashes.setdefault(record['decoded_sha256'], []).append({'split': split, 'image': record['image']})
+                if (index + 1) % 100 == 0:
+                    journal.flush()
+                    temporary = out / 'audit_progress.tmp'
+                    temporary.write_text(json.dumps({'split': split, 'processed': index + 1, 'errors': errors, 'reused': reused}), encoding='utf-8')
+                    temporary.replace(out / 'audit_progress.json')
+            splits[split] = records
     for digest, group in all_hashes.items():
         if len(group) > 1:
             duplicate_groups.append({'sha256': digest, 'files': group})
@@ -122,9 +199,10 @@ def audit(root, out, encoding, official=True):
     counts = {k: len(v) for k, v in splits.items()}
     if official and counts != {'train': 5000, 'validation': 1000, 'test': 4428}:
         errors.append('Official split counts differ: ' + str(counts))
-    report = {'schema': 1, 'source': 'Trans10K v1' if official else 'synthetic-smoke', 'encoding': encoding,
+    report = {'schema': 2, 'source': 'Trans10K v1' if official else 'synthetic-smoke', 'encoding': encoding,
               'counts': counts, 'raw_values_image_counts': values, 'class_pixels': dict(zip(LABELS + ['ignore'], pixel_counts.tolist())),
-              'dimensions': dimensions, 'duplicates': duplicate_groups, 'errors': errors, 'passed': not errors}
+              'dimensions': dimensions, 'duplicates': duplicate_groups, 'errors': errors, 'passed': not errors,
+              'geometry_corrections': corrections, 'journal_reused': reused, 'audit_protocol_sha256': protocol}
     (out / 'audit.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     for split, records in splits.items():
         manifest = {'schema': 1, 'source': report['source'], 'encoding': encoding, 'split': split,
@@ -145,14 +223,23 @@ class SegmentationData(Dataset):
         self.size, self.augment, self.seed, self.epoch = size, augment, seed, 0
         self.mean, self.std = mean, std
         self.cache_images = self.cache_masks = self.cache_meta = None
+        self.cache_inputs = {}
+        self.cache_seed = None
         if cache:
             cache = Path(cache)
             record = json.loads((cache / 'cache.json').read_text())
             if record['manifest_sha256'] != sha256(manifest) or record['size'] != size:
                 raise ValueError('Cache does not match manifest/size')
+            if record.get('protocol_sha256') != cache_protocol():
+                raise ValueError('Cache preprocessing code differs; rebuild the cache')
             self.cache_images = np.load(cache / 'images.npy', mmap_mode='r')
             self.cache_masks = np.load(cache / 'masks.npy', mmap_mode='r')
             self.cache_meta = record['geometry']
+            self.cache_seed = record.get('seed', 42)
+            self.cache_inputs['clean'] = self.cache_images
+            for condition in record.get('conditions', ['clean']):
+                if condition != 'clean':
+                    self.cache_inputs[condition] = np.load(cache / (condition + '.npy'), mmap_mode='r')
 
     def __len__(self):
         return len(self.records)
@@ -161,7 +248,32 @@ class SegmentationData(Dataset):
         record = self.records[index]
         with Image.open(self.root / record['image']) as im:
             rgb = np.asarray(im.convert('RGB')).copy()
-        return rgb, load_mask(self.root / record['mask'], self.manifest['encoding'])
+        mask = self.target(index)
+        if rgb.shape[:2] != mask.shape:
+            raise ValueError('Audited image/mask geometry changed')
+        return rgb, mask
+
+    def target(self, index):
+        record = self.records[index]
+        mask = load_mask(self.root / record['mask'], self.manifest['encoding'])
+        rotation = record.get('mask_rotation_cw', 0)
+        if rotation:
+            mask = np.rot90(mask, -(rotation // 90)).copy()
+        if (record['height'], record['width']) != mask.shape:
+            raise ValueError('Audited image/mask geometry changed')
+        return mask
+
+    def evaluation_item(self, index, condition='clean'):
+        kwargs = {'mean': self.mean, 'std': self.std} if self.mean is not None else {}
+        if condition in self.cache_inputs:
+            if condition != 'clean' and self.cache_seed != self.seed:
+                raise ValueError('Corruption cache seed differs from evaluation')
+            tensor = normalize(self.cache_inputs[condition][index], **kwargs)[None]
+            return tensor, self.cache_meta[index], self.target(index)
+        rgb, target = self.original(index)
+        image = corrupt(rgb, condition, self.seed + index)
+        tensor, meta = preprocess(image, self.size, **kwargs)
+        return tensor, meta, target
 
     def __getitem__(self, index):
         if self.cache_images is not None:
@@ -181,26 +293,54 @@ class SegmentationData(Dataset):
         return torch.from_numpy(normalize(rgb, **kwargs)), torch.from_numpy(mask.astype(np.int64))
 
 
-def prepare_cache(root, manifest, out, size):
+def prepare_cache(root, manifest, out, size, conditions=None, seed=42, workers=4):
+    Path(out).mkdir(parents=True, exist_ok=True)
+    with FileLock(str(Path(out) / '.cache.lock'), timeout=0):
+        return _prepare_cache(root, manifest, out, size, conditions, seed, workers)
+
+
+def _prepare_cache(root, manifest, out, size, conditions=None, seed=42, workers=4):
     out = Path(out)
+    conditions = list(dict.fromkeys(['clean'] + (conditions or [])))
     if (out / 'cache.json').exists():
         record = json.loads((out / 'cache.json').read_text())
         if record['manifest_sha256'] != sha256(manifest) or record['size'] != size:
             raise ValueError('Existing cache differs; choose a new cache directory')
-        return record
+        if record.get('conditions', ['clean']) != conditions or record.get('seed', 42) != seed:
+            raise ValueError('Existing cache appearance protocol differs')
+        if record.get('protocol_sha256') != cache_protocol():
+            raise ValueError('Existing cache preprocessing code differs')
+        return {k: record[k] for k in ('samples', 'size', 'manifest_sha256')}
     out.mkdir(parents=True, exist_ok=True)
     data = SegmentationData(root, manifest, size)
     images = np.lib.format.open_memmap(out / 'images.npy', mode='w+', dtype=np.uint8, shape=(len(data), size, size, 3))
     masks = np.lib.format.open_memmap(out / 'masks.npy', mode='w+', dtype=np.uint8, shape=(len(data), size, size))
+    variants = {condition: np.lib.format.open_memmap(out / (condition + '.npy'), mode='w+', dtype=np.uint8,
+                                                    shape=(len(data), size, size, 3)) for condition in conditions if condition != 'clean'}
     geometry = []
-    for i in range(len(data)):
+    def prepare(i):
         image, mask = data.original(i)
-        images[i], masks[i], meta = letterbox(image, size, mask)
-        geometry.append(meta)
+        clean, target, meta = letterbox(image, size, mask)
+        changed = {condition: letterbox(corrupt(image, condition, seed + i), size)[0] for condition in variants}
+        return clean, target, meta, changed
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, 8))) as pool:
+        for start in range(0, len(data), 16):
+            for i, result in enumerate(pool.map(prepare, range(start, min(start + 16, len(data)))), start):
+                clean, target, meta, changed = result
+                images[i], masks[i] = clean, target
+                geometry.append(meta)
+                for condition, array in changed.items():
+                    variants[condition][i] = array
+            temporary = out / 'cache_progress.tmp'
+            temporary.write_text(json.dumps({'processed': len(geometry), 'total': len(data)}))
+            temporary.replace(out / 'cache_progress.json')
     images.flush()
     masks.flush()
+    for variant in variants.values():
+        variant.flush()
     record = {'manifest_sha256': sha256(manifest), 'size': size, 'geometry': geometry,
-              'source': data.manifest['source'], 'samples': len(data)}
+              'source': data.manifest['source'], 'samples': len(data), 'conditions': conditions, 'seed': seed,
+              'protocol_sha256': cache_protocol()}
     (out / 'cache.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
     return {'samples': len(data), 'size': size, 'manifest_sha256': record['manifest_sha256']}
 

@@ -10,7 +10,7 @@ from PIL import Image
 import pytest
 import torch
 
-from data import load_mask, synthetic, audit, SegmentationData, prepare_cache
+from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, sha256
 from learning import seed_everything, train, load_checkpoint, export_model
 from metrics import Metrics, corrupt
 from models import Student, Teacher, segmentation_loss, boundary_targets, boundary_loss, distillation_loss
@@ -155,6 +155,14 @@ def test_audit_pairing_leakage_and_unknown_values(tmp_path):
     cached_a, cached_b = cached[0]
     torch.testing.assert_close(a, cached_a, rtol=0, atol=0)
     torch.testing.assert_close(b, cached_b, rtol=0, atol=0)
+    prepare_cache(root, tmp_path / 'audit/train.json', tmp_path / 'eval_cache', 64, ['clean', 'brightness', 'blur', 'jpeg'])
+    eval_cached = SegmentationData(root, tmp_path / 'audit/train.json', 64, cache=tmp_path / 'eval_cache')
+    for condition in ('clean', 'brightness', 'blur', 'jpeg'):
+        expected, expected_meta, expected_target = data.evaluation_item(0, condition)
+        actual, actual_meta, actual_target = eval_cached.evaluation_item(0, condition)
+        np.testing.assert_array_equal(expected, actual)
+        np.testing.assert_array_equal(expected_target, actual_target)
+        assert expected_meta == actual_meta
     image = root / 'train/images/smoke_000.png'
     (root / 'validation/images/smoke_000.png').write_bytes(image.read_bytes())
     mask = root / 'train/masks/smoke_000_mask.png'
@@ -181,6 +189,34 @@ def test_train_resume_equivalence_and_config_guard(tmp_path):
     changed = dict(config, lambda_boundary=0.8)
     with pytest.raises(ValueError, match='changed'):
         train(changed, root, manifests, tmp_path / 'full', 'cpu')
+
+
+def test_geometry_recipe_and_audit_journal_recovery(tmp_path):
+    root, destination = tmp_path / 'data', tmp_path / 'audit'
+    synthetic(root, 4)
+    mask_path = root / 'train/masks/smoke_000_mask.png'
+    original = np.asarray(Image.open(mask_path)).copy()
+    Image.fromarray(np.rot90(original, 1)).save(mask_path)
+    with pytest.raises(ValueError, match='audit failed'):
+        audit(root, destination, 'indexed', False)
+    recipe = {'corrections': {'train/images/smoke_000.png': {
+        'mask_rotation_cw': 90, 'reviewed': True,
+        'image_sha256': sha256(root / 'train/images/smoke_000.png'), 'mask_sha256': sha256(mask_path)}}}
+    path = tmp_path / 'geometry.json'
+    path.write_text(json.dumps(recipe))
+    report = audit(root, destination, 'indexed', False, path)
+    assert report['passed'] and report['journal_reused'] == 11
+    dataset = SegmentationData(root, destination / 'train.json', 64)
+    np.testing.assert_array_equal(dataset.original(0)[1], original)
+    journal = destination / 'audit_rows.jsonl'
+    with journal.open('ab') as handle:
+        handle.write(b'{"image": "interrupted')
+    assert audit(root, destination, 'indexed', False, path)['passed']
+    assert audit(root, destination, 'indexed', False, path)['journal_reused'] == 12
+    recipe['corrections']['train/images/smoke_000.png']['mask_sha256'] = '0' * 64
+    path.write_text(json.dumps(recipe))
+    with pytest.raises(ValueError, match='audit failed'):
+        audit(root, destination, 'indexed', False, path)
 
 
 def test_onnx_alignment_and_headless_image_video(tmp_path):

@@ -49,7 +49,7 @@ def pipeline(args):
         run_path = run_out / 'run.json'
         resume = run_path.exists() and config_file(run_path)['status'] != 'completed'
         record = train(config, args.root, args.manifests, run_out, device, resume,
-                       out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache)
+                       out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache, validation_cache=args.validation_cache)
         if record['status'] != 'completed':
             raise RuntimeError('Pipeline stopped at incomplete experiment ' + name)
     students = [(config_file(out / name / 'best_validation.json')['miou'], name)
@@ -64,7 +64,7 @@ def pipeline(args):
         model, checkpoint = restore_model(run_out / 'best.pt', device)
         for condition in ('clean', 'brightness', 'blur', 'jpeg'):
             evaluated = evaluate(model, args.root, Path(args.manifests) / 'test.json', config, device, condition,
-                                 run_out / 'examples' if condition == 'clean' else None)
+                                 run_out / 'examples' if condition == 'clean' else None, cache=args.test_cache)
             evaluated.update(checkpoint_sha256=__import__('data').sha256(run_out / 'best.pt'),
                              run_identity=record['identity'], smoke=record['smoke'])
             write_json(run_out / ('test_' + condition + '.json'), evaluated)
@@ -104,7 +104,7 @@ def calibrate(args, out, device):
         trial_dir = out / 'calibration' / label
         resume = (trial_dir / 'run.json').exists() and config_file(trial_dir / 'run.json')['status'] != 'completed'
         run = train(config, args.root, args.manifests, trial_dir, device, resume,
-                    out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache)
+                    out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache, validation_cache=args.validation_cache)
         trials.append({'name': label, 'family': experiment, 'parameters': changes,
                        'validation_miou': run['best_miou'], 'identity': run['identity']})
     parameters = {}
@@ -130,6 +130,8 @@ def main():
     audit.add_argument('--out', required=True)
     audit.add_argument('--encoding', choices=['trans10k_v1', 'indexed'], required=True)
     audit.add_argument('--synthetic', action='store_true')
+    audit.add_argument('--geometry-overrides')
+    audit.add_argument('--workers', type=int, default=4)
     train = sub.add_parser('train')
     train.add_argument('--config', required=True)
     train.add_argument('--root', required=True)
@@ -142,11 +144,15 @@ def main():
     train.add_argument('--stop-after-epoch', type=int, default=0)
     train.add_argument('--max-train-steps', type=int, default=0)
     train.add_argument('--cache')
+    train.add_argument('--validation-cache')
     cache = sub.add_parser('cache')
     cache.add_argument('--root', required=True)
     cache.add_argument('--manifest', required=True)
     cache.add_argument('--out', required=True)
     cache.add_argument('--size', type=int, default=384)
+    cache.add_argument('--conditions', nargs='+', choices=['clean', 'brightness', 'blur', 'jpeg'], default=['clean'])
+    cache.add_argument('--seed', type=int, default=42)
+    cache.add_argument('--workers', type=int, default=4)
     evaluate = sub.add_parser('evaluate')
     evaluate.add_argument('--checkpoint', required=True)
     evaluate.add_argument('--root', required=True)
@@ -154,6 +160,7 @@ def main():
     evaluate.add_argument('--out', required=True)
     evaluate.add_argument('--device', default='cpu')
     evaluate.add_argument('--corruption', choices=['clean', 'brightness', 'blur', 'jpeg'], default='clean')
+    evaluate.add_argument('--cache')
     export = sub.add_parser('export')
     export.add_argument('--checkpoint', required=True)
     export.add_argument('--out', required=True)
@@ -187,6 +194,8 @@ def main():
     suite.add_argument('--experiments', nargs='+', choices=['T', 'S0', 'S1', 'S2', 'S3'], default=['T', 'S0', 'S1', 'S2', 'S3'])
     suite.add_argument('--device', default='auto')
     suite.add_argument('--cache')
+    suite.add_argument('--validation-cache')
+    suite.add_argument('--test-cache')
     suite.add_argument('--calibrate', action='store_true')
     args = parser.parse_args()
     if args.command == 'env':
@@ -197,18 +206,18 @@ def main():
         result = {'source': 'synthetic-smoke', 'root': args.root}
     elif args.command == 'audit':
         from data import audit
-        result = audit(args.root, args.out, args.encoding, not args.synthetic)
+        result = audit(args.root, args.out, args.encoding, not args.synthetic, args.geometry_overrides, args.workers)
     elif args.command == 'train':
         from learning import train
         result = train(config_file(args.config), args.root, args.manifests, args.out, args.device, args.resume,
-                       args.teacher, args.baseline_validation, args.stop_after_epoch, args.max_train_steps, args.cache)
+                       args.teacher, args.baseline_validation, args.stop_after_epoch, args.max_train_steps, args.cache, args.validation_cache)
     elif args.command == 'cache':
         from data import prepare_cache
-        result = prepare_cache(args.root, args.manifest, args.out, args.size)
+        result = prepare_cache(args.root, args.manifest, args.out, args.size, args.conditions, args.seed, args.workers)
     elif args.command == 'evaluate':
         from learning import restore_model, evaluate, write_json
         model, cp = restore_model(args.checkpoint, args.device)
-        result = evaluate(model, args.root, args.manifest, cp['config'], args.device, args.corruption)
+        result = evaluate(model, args.root, args.manifest, cp['config'], args.device, args.corruption, cache=args.cache)
         result['smoke'] = cp['smoke']
         write_json(args.out, result)
     elif args.command == 'export':
@@ -242,6 +251,14 @@ def main():
         result = comparison(args.baseline, args.final, args.root, args.manifest, args.out, args.device)
     else:
         result = pipeline(args)
+    if args.command == 'pipeline':
+        result = {'status': 'completed', 'out': args.out, 'experiments': list(result)}
+    elif args.command == 'train':
+        result = {key: result.get(key) for key in ('status', 'global_step', 'best_miou', 'elapsed_seconds', 'identity')}
+    elif args.command == 'evaluate':
+        result = {key: value for key, value in result.items() if key != 'per_image'}
+    elif args.command == 'audit':
+        result = {key: result[key] for key in ('passed', 'counts', 'errors', 'journal_reused')}
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

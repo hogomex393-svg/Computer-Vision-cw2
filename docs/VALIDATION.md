@@ -29,3 +29,9 @@ Only executed checks belong here. Code existence is not a pass.
 - GitHub authentication completed via user-approved device flow. Working branch remote SHA 7b694c31cbf16f02f1d91d2bf475b80b44b524d0 verified with ls-remote. No force push.
 - First fresh remote checkout: 10 passed, 4 setup errors because artifacts/ was absent in a clean clone. Fixed tests to initialize their output parent. Reverification follows.
 - Unicode video filename and output folder: eight frames processed successfully, output video created.
+
+- Remote fresh checkout after initialization fix: 14 passed in 25.28 seconds, artifacts/remote_pytest.xml (remote 1f4476a).
+- Full dimension inventory: 18 mismatches, all in train. All 18 were visually checked in both rotation directions. Explicit SHA-bound recipes preserve original files and official split membership.
+- Geometry repair, hash refusal, journal reuse and truncated-tail recovery regression added. Full suite: 15 passed in 22.02 seconds.
+- Validation/corruption cache equivalence tested for clean/brightness/blur/JPEG; full suite 15 passed in 33.74 seconds.
+- 384x384 smoke export: max logit error 1.24e-5 and mask agreement 1.0; artifacts/student_smoke_384.json.
