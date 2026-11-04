@@ -8,7 +8,7 @@
 
 真实数据：官方 train/validation/test 全部下载、CRC 校验并解压，逐张审计完成。18 个训练标签方向异常已显式修正；11 组源数据跨集合重复保留在原始失败报告中。实际实验使用独立验收通过的 leak-free-v1 清单 4990/999/4428，全部测试图保留。
 
-正式训练：T、S0、S1、S2、S3 目前 pending。已有 runs/smoke 仅为合成样本功能验证。正式 checkpoint、日志和结果将在完成后写入本文件。
+正式训练：正式系列为 runs/final；当前阶段见 PROGRESS 顶部自动状态。runs/formal/T 是已完成一轮的真实性能 pilot，不能当成 20 轮完成。runs/smoke 仅为合成样本功能验证。正式 checkpoint、日志和结果将在完成后写入本文件。
 
 模型导出：合成样本学生已经完成 PyTorch/ONNX Runtime 对齐，不能作为真实透明物体模型。正式模型导出 pending。
 

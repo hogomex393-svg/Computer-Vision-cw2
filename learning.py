@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from datetime import datetime, timezone, timedelta
 import hashlib
 import json
 import os
@@ -15,7 +16,7 @@ from torch.utils.data import DataLoader
 from filelock import FileLock
 
 from data import SegmentationData, sha256
-from metrics import Metrics, corrupt
+from metrics import Metrics, corrupt, tensor_statistics, miou_from_confusion
 from models import build_model, segmentation_loss, boundary_loss, distillation_loss
 from runtime import preprocess, restore_logits, overlay, MEAN, STD
 
@@ -37,6 +38,44 @@ def write_json(path, value):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(value, indent=2, allow_nan=False), encoding='utf-8')
     temporary.replace(path)
+
+
+def record_progress(run_root, stage, document=None):
+    run_root = Path(run_root)
+    document = Path(document) if document else Path(__file__).parent / 'docs/PROGRESS.md'
+    stamp = datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')
+    rows = []
+    for name in ('T', 'S0', 'S1', 'S2', 'S3'):
+        path = run_root / name / 'run.json'
+        value = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+        rows.append({'name': name, 'status': value.get('status', 'pending'),
+                     'epoch': value.get('last_completed_epoch', 0), 'budget': value.get('config', {}).get('epochs'),
+                     'best_validation_miou': value.get('best_miou'), 'pid': value.get('pid')})
+    snapshot = {'updated_at': stamp, 'run_root': str(run_root), 'stage': stage, 'experiments': rows}
+    write_json(run_root / 'CURRENT_STAGE.json', snapshot)
+    begin, end = '<!-- CV_CW2_AUTO_PROGRESS_BEGIN -->', '<!-- CV_CW2_AUTO_PROGRESS_END -->'
+    lines = [begin, '## 自动运行进度', '', '更新时间：' + stamp, '当前阶段：' + stage,
+             '运行目录：' + str(run_root), '以下为最近检查点；恢复前仍需核对进程和日志。', '']
+    for row in rows:
+        score = row['best_validation_miou']
+        text = '{}：{}，完整轮次 {}/{}'.format(row['name'], row['status'], row['epoch'], row['budget'] or 'pending')
+        if score is not None:
+            text += '，最佳验证 mIoU {:.6f}'.format(score)
+        lines.append(text + '。')
+    lines.extend(['', '模型训练、测试、导出与真实 Nano 验收是不同状态。', end, ''])
+    generated = '\n'.join(lines)
+    document.parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(document) + '.lock', timeout=10):
+        original = document.read_text(encoding='utf-8') if document.exists() else ''
+        if begin in original and end in original:
+            before, _, rest = original.partition(begin)
+            _, _, after = rest.partition(end)
+            updated = before + generated + after
+        else:
+            updated = generated + '\n' + original
+        temporary = document.with_suffix('.md.tmp')
+        temporary.write_text(updated, encoding='utf-8')
+        temporary.replace(document)
 
 
 def identity(config, manifests):
@@ -62,17 +101,30 @@ def evaluate(model, root, manifest, config, device, corruption='clean', preview=
     data = SegmentationData(root, manifest, config['size'], seed=config['seed'], mean=config.get('mean'), std=config.get('std'), cache=cache)
     metrics = Metrics(config['boundary_tolerance'])
     per_image = []
+    gpu_metric_samples = 0
     was_training = model.training
     model.eval()
     with torch.no_grad():
         for i in range(min(len(data), max_samples) if max_samples else len(data)):
             tensor, meta, target = data.evaluation_item(i, corruption)
             logits = model(torch.from_numpy(tensor).to(device))['logits'].float().cpu().numpy()
-            prediction = restore_logits(logits, meta).argmax(-1).astype(np.uint8)
-            metrics.update(prediction, target)
-            single = Metrics(config['boundary_tolerance'])
-            single.update(prediction, target)
-            per_image.append({'image': data.records[i]['image'], 'miou': single.result()['miou']})
+            restored = restore_logits(logits, meta)
+            if device.startswith('cuda') and target.size <= 17000000:
+                prediction_gpu = torch.from_numpy(restored).to(device).argmax(-1).to(torch.uint8)
+                target_array = np.asarray(target)
+                if not target_array.flags.writeable:
+                    target_array = target_array.copy()
+                target_gpu = torch.from_numpy(target_array).to(device)
+                counts, boundary_counts = tensor_statistics(prediction_gpu, target_gpu, config['boundary_tolerance'])
+                metrics.confusion += counts
+                metrics.boundary += boundary_counts
+                gpu_metric_samples += 1
+                prediction = prediction_gpu.cpu().numpy() if preview and i < 4 else None
+                del prediction_gpu, target_gpu
+            else:
+                prediction = restored.argmax(-1).astype(np.uint8)
+                counts = metrics.update(prediction, target)
+            per_image.append({'image': data.records[i]['image'], 'miou': miou_from_confusion(counts)})
             if preview and i < 4:
                 rgb, _ = data.original(i)
                 preview = Path(preview)
@@ -83,7 +135,7 @@ def evaluate(model, root, manifest, config, device, corruption='clean', preview=
     result.update({'samples': len(per_image), 'corruption': corruption, 'seed': config['seed'],
                    'dataset_source': data.manifest['source'], 'split': data.manifest['split'], 'per_image': per_image,
                    'manifest_sha256': sha256(manifest), 'data_protocol': data.manifest.get('protocol', 'official'),
-                   'effective_split_counts': data.manifest.get('effective_counts')})
+                   'effective_split_counts': data.manifest.get('effective_counts'), 'gpu_metric_samples': gpu_metric_samples})
     return result
 
 
@@ -171,15 +223,19 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
         if device.startswith('cuda') and checkpoint['cuda_state']:
             torch.cuda.set_rng_state_all(checkpoint['cuda_state'])
     run = {'identity': run_id, 'status': 'running', 'smoke': smoke, 'config': config, 'batch_size': batch,
-           'device': device, 'provenance': provenance}
+           'device': device, 'provenance': provenance, 'pid': os.getpid(),
+           'last_completed_epoch': epoch_start, 'global_step': step, 'best_miou': best if best >= 0 else None}
     git = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True)
     run['git_commit_at_start'] = git.stdout.strip() if git.returncode == 0 else 'unavailable'
     write_json(out / 'run.json', run)
+    progress_root = out.parent.parent if config.get('experiment', '').startswith('calibration_') else out.parent
     if device.startswith('cuda'):
         torch.cuda.reset_peak_memory_stats()
     started = time.perf_counter()
     try:
         for epoch in range(epoch_start, config['epochs']):
+            if not smoke:
+                record_progress(progress_root, '{}：训练第 {} 轮'.format(config['experiment'], epoch + 1))
             train_data.epoch = epoch
             generator = torch.Generator().manual_seed(config['seed'] + epoch)
             loader = DataLoader(train_data, batch_size=batch, shuffle=True, num_workers=0,
@@ -214,7 +270,12 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
                 if max_train_steps and index + 1 >= max_train_steps:
                     break
             scheduler.step()
+            training_seconds = time.perf_counter() - epoch_start_time
+            if not smoke:
+                record_progress(progress_root, '{}：验证第 {} 轮'.format(config['experiment'], epoch + 1))
+            validation_started = time.perf_counter()
             validation = evaluate(model, root, val_manifest, config, device, cache=validation_cache)
+            validation_seconds = time.perf_counter() - validation_started
             score = validation['miou']
             if score is None:
                 raise ValueError('Validation contains no valid pixels')
@@ -233,7 +294,8 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
                 (out / 'best.pt.tmp').replace(out / 'best.pt')
                 write_json(out / 'best_validation.json', validation)
             entry = {'epoch': epoch + 1, 'step': step, 'loss': float(np.mean(losses)), 'validation_miou': score,
-                     'epoch_seconds': time.perf_counter() - epoch_start_time, 'lr_next': scheduler.get_last_lr()[0]}
+                     'epoch_seconds': time.perf_counter() - epoch_start_time, 'train_seconds': training_seconds,
+                     'validation_seconds': validation_seconds, 'lr_next': scheduler.get_last_lr()[0]}
             with (out / 'epochs.jsonl').open('a', encoding='utf-8') as log:
                 log.write(json.dumps(entry) + '\n')
             run.update(last_completed_epoch=epoch + 1, global_step=step, best_miou=best)
@@ -247,10 +309,14 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
     except Exception as error:
         run.update(status='failed', error=repr(error))
         write_json(out / 'run.json', run)
+        if not smoke:
+            record_progress(progress_root, '{}：失败，查看 run.json 与控制台日志'.format(config['experiment']))
         raise
     run.update(global_step=step, best_miou=best, elapsed_seconds=time.perf_counter() - started,
                peak_cuda_bytes=torch.cuda.max_memory_allocated() if device.startswith('cuda') else None)
     write_json(out / 'run.json', run)
+    if not smoke:
+        record_progress(progress_root, '{}：{}'.format(config['experiment'], run['status']))
     return run
 
 

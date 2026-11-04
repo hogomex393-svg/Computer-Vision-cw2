@@ -21,6 +21,28 @@ def cache_protocol():
     return hashlib.sha256((inspect.getsource(letterbox) + inspect.getsource(corrupt)).encode()).hexdigest()
 
 
+def pack_labels(labels):
+    if not np.isin(labels, [0, 1, 2, 255]).all():
+        raise ValueError('Unknown labels cannot be packed')
+    flat = labels.ravel()
+    padded = np.pad(flat, (0, (-len(flat)) % 4), constant_values=0).reshape(-1, 4)
+    return (((padded[:, 0] & 3) << 6) | ((padded[:, 1] & 3) << 4) |
+            ((padded[:, 2] & 3) << 2) | (padded[:, 3] & 3)).astype(np.uint8)
+
+
+def unpack_labels(packed, shape):
+    pixels = int(np.prod(shape))
+    if len(packed) != (pixels + 3) // 4:
+        raise ValueError('Packed target size mismatch')
+    values = np.empty(len(packed) * 4, np.uint8)
+    values[0::4] = packed >> 6
+    values[1::4] = (packed >> 4) & 3
+    values[2::4] = (packed >> 2) & 3
+    values[3::4] = packed & 3
+    values[values == 3] = 255
+    return values[:pixels].reshape(shape)
+
+
 def load_mask(path, encoding):
     with Image.open(path) as image:
         return decode_mask_image(image, encoding, str(path))
@@ -269,6 +291,7 @@ class SegmentationData(Dataset):
         self.cache_images = self.cache_masks = self.cache_meta = None
         self.cache_inputs = {}
         self.cache_seed = None
+        self.cached_targets = self.target_offsets = None
         if cache:
             cache = Path(cache)
             record = json.loads((cache / 'cache.json').read_text())
@@ -284,6 +307,12 @@ class SegmentationData(Dataset):
             for condition in record.get('conditions', ['clean']):
                 if condition != 'clean':
                     self.cache_inputs[condition] = np.load(cache / (condition + '.npy'), mmap_mode='r')
+            if 'original_targets' in record:
+                info = record['original_targets']
+                if info['format'] != 'packed2-v1':
+                    raise ValueError('Unsupported original target cache format')
+                self.cached_targets = np.memmap(cache / info['file'], dtype=np.uint8, mode='r', shape=(info['bytes'],))
+                self.target_offsets = info['offsets']
 
     def __len__(self):
         return len(self.records)
@@ -299,6 +328,9 @@ class SegmentationData(Dataset):
 
     def target(self, index):
         record = self.records[index]
+        if self.cached_targets is not None:
+            start, end = self.target_offsets[index:index + 2]
+            return unpack_labels(self.cached_targets[start:end], (record['height'], record['width']))
         mask = load_mask(self.root / record['mask'], self.manifest['encoding'])
         rotation = record.get('mask_rotation_cw', 0)
         if rotation:
@@ -406,3 +438,33 @@ def synthetic(root, count=12, seed=42):
             Image.fromarray(rgb).save(root / split / 'images' / ('smoke_{:03}.png'.format(index)))
             Image.fromarray(mask).save(root / split / 'masks' / ('smoke_{:03}_mask.png'.format(index)))
     (root / 'SYNTHETIC_ONLY.txt').write_text('Synthetic colored shapes, NOT transparent-object benchmark data.\n')
+
+
+def cache_original_targets(root, manifest, cache, workers=4):
+    cache = Path(cache)
+    with FileLock(str(cache / '.cache.lock'), timeout=0):
+        metadata = json.loads((cache / 'cache.json').read_text())
+        if metadata['manifest_sha256'] != sha256(manifest):
+            raise ValueError('Target cache manifest mismatch')
+        if 'original_targets' in metadata:
+            return {'pixels': metadata['original_targets']['pixels'], 'reused': True}
+        data = SegmentationData(root, manifest, metadata['size'])
+        offsets = [0]
+        for record in data.records:
+            offsets.append(offsets[-1] + (record['height'] * record['width'] + 3) // 4)
+        output = np.memmap(cache / 'original_targets.2bit', dtype=np.uint8, mode='w+', shape=(offsets[-1],))
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, 8))) as pool:
+            for start in range(0, len(data), 16):
+                for index, target in enumerate(pool.map(data.target, range(start, min(start + 16, len(data)))), start):
+                    output[offsets[index]:offsets[index + 1]] = pack_labels(target)
+                temporary = cache / 'target_progress.tmp'
+                temporary.write_text(json.dumps({'processed': min(start + 16, len(data)), 'total': len(data)}))
+                temporary.replace(cache / 'target_progress.json')
+        output.flush()
+        pixels = sum(r['height'] * r['width'] for r in data.records)
+        metadata['original_targets'] = {'file': 'original_targets.2bit', 'format': 'packed2-v1',
+                                        'pixels': pixels, 'bytes': offsets[-1], 'offsets': offsets}
+        temporary = cache / 'cache_targets.tmp'
+        temporary.write_text(json.dumps(metadata, indent=2), encoding='utf-8')
+        temporary.replace(cache / 'cache.json')
+        return {'pixels': pixels, 'bytes': offsets[-1], 'reused': False}

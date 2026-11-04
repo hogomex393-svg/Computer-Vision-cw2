@@ -29,7 +29,20 @@ def environment(out):
 
 
 def pipeline(args):
-    from learning import train, restore_model, evaluate, export_model, write_json, comparison
+    from learning import write_json, record_progress
+    try:
+        result = run_pipeline(args)
+        write_json(Path(args.out) / 'pipeline.json', {'status': 'completed', 'experiments': args.experiments})
+        record_progress(args.out, '主机训练、测试、导出流水线完成；模型包交付与 Nano 验收另行记录')
+        return result
+    except Exception as error:
+        write_json(Path(args.out) / 'pipeline.json', {'status': 'failed', 'error': repr(error)})
+        record_progress(args.out, '流水线失败：' + str(error))
+        raise
+
+
+def run_pipeline(args):
+    from learning import train, restore_model, evaluate, export_model, write_json, comparison, record_progress
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     device = args.device
@@ -39,6 +52,7 @@ def pipeline(args):
     results = {}
     for name in args.experiments:
         if name == 'S1' and args.calibrate:
+            record_progress(out, '验证集参数校准')
             calibrate(args, out, device)
         config = config_file(Path(args.config_dir) / (name + '.json'))
         if name in ('S1', 'S2', 'S3') and (out / 'calibration/selection.json').exists():
@@ -63,6 +77,7 @@ def pipeline(args):
         config = record['config']
         model, checkpoint = restore_model(run_out / 'best.pt', device)
         for condition in ('clean', 'brightness', 'blur', 'jpeg'):
+            record_progress(out, '{}：完整测试集 {}'.format(name, condition))
             evaluated = evaluate(model, args.root, Path(args.manifests) / 'test.json', config, device, condition,
                                  run_out / 'examples' if condition == 'clean' else None, cache=args.test_cache)
             evaluated.update(checkpoint_sha256=__import__('data').sha256(run_out / 'best.pt'),
@@ -73,7 +88,9 @@ def pipeline(args):
         del model
     if len(students) == 4:
         for size in (256, 384, 512):
+            record_progress(out, '{}：导出与对齐 {}'.format(selected, size))
             export_model(out / selected / 'best.pt', out / 'exports' / ('{}_{}.onnx'.format(selected, size)), size=size)
+        record_progress(out, '生成固定案例和失败案例对照图')
         comparison(out / 'S0/best.pt', out / selected / 'best.pt', args.root,
                    Path(args.manifests) / 'test.json', out / 'comparison', device)
     write_json(out / 'summary.json', results)
@@ -156,6 +173,11 @@ def main():
     cache.add_argument('--conditions', nargs='+', choices=['clean', 'brightness', 'blur', 'jpeg'], default=['clean'])
     cache.add_argument('--seed', type=int, default=42)
     cache.add_argument('--workers', type=int, default=4)
+    targets = sub.add_parser('cache-targets')
+    targets.add_argument('--root', required=True)
+    targets.add_argument('--manifest', required=True)
+    targets.add_argument('--cache', required=True)
+    targets.add_argument('--workers', type=int, default=4)
     evaluate = sub.add_parser('evaluate')
     evaluate.add_argument('--checkpoint', required=True)
     evaluate.add_argument('--root', required=True)
@@ -220,6 +242,9 @@ def main():
     elif args.command == 'cache':
         from data import prepare_cache
         result = prepare_cache(args.root, args.manifest, args.out, args.size, args.conditions, args.seed, args.workers)
+    elif args.command == 'cache-targets':
+        from data import cache_original_targets
+        result = cache_original_targets(args.root, args.manifest, args.cache, args.workers)
     elif args.command == 'evaluate':
         from learning import restore_model, evaluate, write_json
         model, cp = restore_model(args.checkpoint, args.device)

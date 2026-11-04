@@ -13,6 +13,11 @@ __pycache__/
 *.mp4
 *.avi
 *.log
+*.npy
+*.npz
+*.2bit
+docs/*.lock
+docs/*.tmp
 local.*
 Moodle课程资料索引.json
 核查说明.txt

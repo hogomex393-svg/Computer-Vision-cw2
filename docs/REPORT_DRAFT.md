@@ -6,7 +6,7 @@ This is a working report draft. Only measured values from the result receipts ma
 
 Given one RGB image, predict background, transparent things and transparent stuff at every original-resolution pixel. Transparent surfaces inherit background appearance and can have weak or misleading edges. The project studies edge deployment of a lightweight segmentation model with two established training improvements, rather than claiming an original segmentation architecture.
 
-The teacher is SegFormer-B2, a hierarchical Mix Transformer encoder with an all-MLP fusion decoder. The teacher starts from NVIDIA's ADE20K weights and receives a new three-class classifier, then must be fine-tuned on Trans10K. MobileNetV3-Large supplies the student's approximately 1/4, 1/8, 1/16 and 1/32 features. Learned 1x1 projections map them to 64 channels; bilinear upsampling, summation and depthwise/pointwise convolution fuse the pyramid. A three-channel classifier produces logits.
+The teacher is SegFormer-B2, a hierarchical Mix Transformer encoder with an all-MLP fusion decoder. The teacher starts from NVIDIA's ADE20K weights and receives a new three-class classifier, then must be fine-tuned on Trans10K. MobileNetV3-Large supplies the student's approximately 1/4, 1/8, 1/16 and 1/32 features. Learned 1x1 projections map them to 64 channels; bilinear upsampling, summation and depthwise/pointwise convolution fuse the pyramid. A three-channel classifier produces logits. The measured three-class B2 implementation has 27,348,931 parameters; the student inference network has 3,064,819. The auxiliary boundary head adds 18,497 parameters during training and is removed for deployment.
 
 ## Data and integrity
 

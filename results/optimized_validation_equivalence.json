@@ -1,0 +1,46 @@
+{
+  "checkpoint": "runs/formal/T/best.pt",
+  "validation_samples": 999,
+  "seconds": 102.86803040000086,
+  "gpu_metric_samples": 999,
+  "exact_reference_matches": {
+    "miou": true,
+    "per_class_iou": true,
+    "foreground_iou": true,
+    "foreground_dice": true,
+    "boundary_f1": true,
+    "confusion": true,
+    "valid_pixels": true,
+    "samples": true
+  },
+  "metrics": {
+    "miou": 0.873376916401604,
+    "per_class_iou": [
+      0.9359693232038868,
+      0.8555722295096805,
+      0.8285891964912446
+    ],
+    "foreground_iou": 0.8442424212782463,
+    "foreground_dice": 0.9155438694367534,
+    "boundary_f1": 0.0862471619703036,
+    "confusion": [
+      [
+        7758753177,
+        64222520,
+        284500741
+      ],
+      [
+        52770291,
+        785594277,
+        9926188
+      ],
+      [
+        129291170,
+        5695906,
+        2075760676
+      ]
+    ],
+    "valid_pixels": 11166514946,
+    "samples": 999
+  }
+}

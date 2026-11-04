@@ -30,7 +30,8 @@ class Metrics:
         valid = target != 255
         if not np.isin(target[valid], [0, 1, 2]).all() or not np.isin(prediction[valid], [0, 1, 2]).all():
             raise ValueError('Invalid metric class')
-        self.confusion += np.bincount((target[valid] * 3 + prediction[valid]).astype(int), minlength=9).reshape(3, 3)
+        counts = np.bincount((target[valid] * 3 + prediction[valid]).astype(int), minlength=9).reshape(3, 3)
+        self.confusion += counts
         kernel = np.ones((2 * self.tolerance + 1, 2 * self.tolerance + 1), np.uint8)
         safe = cv2.erode(valid.astype(np.uint8), kernel, borderType=cv2.BORDER_CONSTANT, borderValue=1).astype(bool)
         for category in (1, 2):
@@ -39,6 +40,7 @@ class Metrics:
             matched_pred = pred & (cv2.dilate(true.astype(np.uint8), kernel) > 0)
             matched_true = true & (cv2.dilate(pred.astype(np.uint8), kernel) > 0)
             self.boundary += np.array([matched_pred.sum(), pred.sum(), matched_true.sum(), true.sum()])
+        return counts
 
     def result(self):
         matrix = self.confusion
@@ -61,6 +63,45 @@ class Metrics:
                 'confusion': matrix.tolist(), 'valid_pixels': int(matrix.sum()),
                 'absent_class_policy': 'exclude only classes with zero union',
                 'boundary_policy': 'micro over foreground classes; Chebyshev tolerance at original resolution; empty/empty=null'}
+
+
+def miou_from_confusion(counts):
+    intersection = np.diag(counts)
+    union = counts.sum(0) + counts.sum(1) - intersection
+    valid = union > 0
+    return float(np.mean(intersection[valid] / union[valid])) if valid.any() else None
+
+
+def tensor_statistics(prediction, target, tolerance=2):
+    import torch
+    from torch.nn import functional as F
+    if prediction.shape != target.shape:
+        raise ValueError('Metric shapes differ')
+    valid = target != 255
+    truths = [target == c for c in (0, 1, 2)]
+    predictions = [prediction == c for c in (0, 1, 2)]
+    if (valid & ~(truths[0] | truths[1] | truths[2])).any() or (valid & ~(predictions[0] | predictions[1] | predictions[2])).any():
+        raise ValueError('Invalid metric class')
+    counts = torch.stack([(a & b & valid).sum() for a in truths for b in predictions]).reshape(3, 3)
+    def dilate(binary):
+        return F.max_pool2d(binary[None, None].float(), 2 * tolerance + 1, 1, tolerance)[0, 0] > 0
+    safe = valid if valid.all() else valid & ~dilate(~valid)
+    def boundary(binary):
+        result = torch.zeros_like(valid)
+        horizontal = (binary[:, 1:] != binary[:, :-1]) & valid[:, 1:] & valid[:, :-1]
+        vertical = (binary[1:] != binary[:-1]) & valid[1:] & valid[:-1]
+        result[:, 1:] |= horizontal
+        result[:, :-1] |= horizontal
+        result[1:] |= vertical
+        result[:-1] |= vertical
+        return result & safe
+    boundary_counts = torch.zeros(4, dtype=torch.int64, device=prediction.device)
+    for category in (1, 2):
+        pred = boundary(predictions[category])
+        true = boundary(truths[category])
+        boundary_counts += torch.stack([(pred & dilate(true)).sum(), pred.sum(),
+                                        (true & dilate(pred)).sum(), true.sum()])
+    return counts.cpu().numpy(), boundary_counts.cpu().numpy()
 
 
 def corrupt(rgb, kind, seed=42):

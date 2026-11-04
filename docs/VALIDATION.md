@@ -38,3 +38,16 @@ Only executed checks belong here. Code existence is not a pass.
 
 - EXIF orientation consistency added: raw JPEG pixel grid matches between dataset and demo. Full regression: 16 passed in 62.17 seconds while dataset caches were being prepared.
 - Derived split validation passed: source 5000/1000/4428, effective 4990/999/4428, zero exact cross-split intersections, test set retained in full. Raw audit remains failed for its known cross-split duplicates; no assertions were disabled.
+
+- Actual teacher full first epoch (locked source f6d7364, leak-free-v1): 1248 minibatches, loss 0.3784324, whole-validation mIoU 0.8733769, epoch 1237.84 seconds. runs/formal/T/last.pt and best.pt exist; run status interrupted_at_epoch_boundary by the requested one-epoch timing gate. This is NOT completion of the configured 20 epochs or a test-set result.
+- Original-resolution evaluation profiling is now in progress; artifacts/evaluation_profile.txt will contain measured hotspots.
+
+## Evaluation performance correction
+
+The 10-image profile identified duplicated boundary computation and original mask decoding as major costs. Per-image mIoU now reuses the computed confusion matrix. CUDA integer statistics retain the same shared CPU geometric restoration, and original labels use a lossless 2-bit cache. No pixels, classes or samples are omitted.
+
+The existing one-epoch teacher was re-evaluated on all 999 validation images: 102.868 seconds, 999 GPU-statistics samples. mIoU, per-class IoUs, foreground IoU/Dice, boundary F1, confusion matrix, valid-pixel count and sample count match the previous CPU results exactly. Receipt: artifacts/optimized_validation_equivalence.json.
+
+Full regression after metric/cache changes: 20 passed in 9.27 seconds. Automatic progress preservation regression added; full suite 21 passed in 10.46 seconds.
+
+Historical runs/formal/T remains a one-epoch timing pilot. Because code identity changed, the final series starts in runs/final rather than bypassing resume guards.

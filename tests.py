@@ -10,9 +10,9 @@ from PIL import Image
 import pytest
 import torch
 
-from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, sha256, prepare_splits
-from learning import seed_everything, train, load_checkpoint, export_model
-from metrics import Metrics, corrupt
+from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, sha256, prepare_splits, cache_original_targets, pack_labels, unpack_labels
+from learning import seed_everything, train, load_checkpoint, export_model, record_progress
+from metrics import Metrics, corrupt, tensor_statistics
 from models import Student, Teacher, segmentation_loss, boundary_targets, boundary_loss, distillation_loss
 from runtime import letterbox, preprocess, restore_logits, ONNXRunner, demo, video_path, write_image, read_image
 
@@ -53,6 +53,15 @@ def test_letterbox_mask_and_restore_coordinates():
     assert tensor.shape == (1, 3, 96, 96) and tensor.dtype == np.float32
 
 
+def test_packed_targets_preserve_every_label_and_odd_shapes():
+    target = np.array([[0, 1, 2, 255, 1], [255, 0, 2, 1, 0], [2, 255, 1, 0, 2]], np.uint8)
+    packed = pack_labels(target)
+    assert len(packed) == 4
+    np.testing.assert_array_equal(unpack_labels(packed, target.shape), target)
+    with pytest.raises(ValueError, match='Unknown'):
+        pack_labels(np.array([[3]], np.uint8))
+
+
 def test_metrics_manual_and_absent_classes():
     metric = Metrics(0)
     metric.update(np.array([[0, 2], [2, 99]]), np.array([[0, 1], [2, 255]]))
@@ -66,6 +75,30 @@ def test_metrics_manual_and_absent_classes():
     empty = Metrics()
     empty.update(np.zeros((2, 2), int), np.full((2, 2), 255))
     assert empty.result()['miou'] is None
+
+
+@pytest.mark.parametrize('device', ['cpu'] + (['cuda'] if torch.cuda.is_available() else []))
+def test_tensor_metrics_match_reference_exactly(device):
+    rng = np.random.default_rng(7)
+    for tolerance in (0, 2):
+        for shape in ((7, 13), (101, 211)):
+            target = rng.integers(0, 3, shape, dtype=np.uint8)
+            predicted = rng.integers(0, 3, shape, dtype=np.uint8)
+            target[::4, ::3] = 255
+            predicted[target == 255] = 99
+            reference = Metrics(tolerance)
+            reference.update(predicted, target)
+            counts, boundary = tensor_statistics(torch.from_numpy(predicted).to(device), torch.from_numpy(target).to(device), tolerance)
+            np.testing.assert_array_equal(counts, reference.confusion)
+            np.testing.assert_array_equal(boundary, reference.boundary)
+    for value in (0, 255):
+        target = np.full((9, 14), value, np.uint8)
+        predicted = np.zeros_like(target)
+        reference = Metrics()
+        reference.update(predicted, target)
+        counts, boundary = tensor_statistics(torch.from_numpy(predicted).to(device), torch.from_numpy(target).to(device))
+        np.testing.assert_array_equal(counts, reference.confusion)
+        np.testing.assert_array_equal(boundary, reference.boundary)
 
 
 def test_image_loading_uses_same_raw_grid_despite_exif(tmp_path):
@@ -176,6 +209,10 @@ def test_audit_pairing_leakage_and_unknown_values(tmp_path):
         np.testing.assert_array_equal(expected, actual)
         np.testing.assert_array_equal(expected_target, actual_target)
         assert expected_meta == actual_meta
+    cache_original_targets(root, tmp_path / 'audit/train.json', tmp_path / 'eval_cache')
+    target_cached = SegmentationData(root, tmp_path / 'audit/train.json', 64, cache=tmp_path / 'eval_cache')
+    for i in range(len(data)):
+        np.testing.assert_array_equal(target_cached.target(i), data.target(i))
     image = root / 'train/images/smoke_000.png'
     (root / 'validation/images/smoke_000.png').write_bytes(image.read_bytes())
     mask = root / 'train/masks/smoke_000_mask.png'
@@ -283,3 +320,31 @@ def test_seeded_robustness_and_nano_syntax():
         path = Path(name)
         if path.exists():
             ast.parse(path.read_text(encoding='utf-8'), feature_version=(3, 6))
+
+
+def test_summary_refuses_mixed_dataset_identities(tmp_path):
+    from report import summarize
+    for name, fingerprint in [('S0', 'dataset-a'), ('S1', 'dataset-b')]:
+        folder = tmp_path / name
+        folder.mkdir()
+        run = {'status': 'completed', 'identity': name, 'smoke': False, 'config': smoke_config(),
+               'provenance': {'sources': {'models.py': 'same'}, 'manifests': {'train.json': fingerprint}}}
+        (folder / 'run.json').write_text(json.dumps(run))
+    with pytest.raises(ValueError, match='experimental protocol'):
+        summarize(tmp_path, tmp_path / 'summary')
+    assert not (tmp_path / 'summary/results.json').exists()
+
+
+def test_progress_updates_preserve_manual_notes(tmp_path):
+    document = tmp_path / 'PROGRESS.md'
+    document.write_text('Manual note: keep the original data.\n', encoding='utf-8')
+    root = tmp_path / 'runs'
+    (root / 'T').mkdir(parents=True)
+    (root / 'T/run.json').write_text(json.dumps({'status': 'running', 'last_completed_epoch': 1,
+                                               'config': {'epochs': 20}, 'best_miou': 0.5}))
+    record_progress(root, 'training', document)
+    record_progress(root, 'validation', document)
+    text = document.read_text(encoding='utf-8')
+    assert text.count('CV_CW2_AUTO_PROGRESS_BEGIN') == 1
+    assert 'Manual note: keep the original data.' in text
+    assert 'validation' in text and '1/20' in text

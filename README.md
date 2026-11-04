@@ -36,8 +36,8 @@ python project.py prepare-splits --audit data/manifests --out data/clean_manifes
 python project.py cache --root data/Trans10K --manifest data/clean_manifests/train.json --out data/train_cache384 --size 384
 python project.py cache --root data/Trans10K --manifest data/clean_manifests/validation.json --out data/val_cache384 --size 384
 python project.py cache --root data/Trans10K --manifest data/clean_manifests/test.json --out data/test_cache384 --size 384 --conditions clean brightness blur jpeg
-python project.py pipeline --root data/Trans10K --manifests data/clean_manifests --cache data/train_cache384 --validation-cache data/val_cache384 --test-cache data/test_cache384 --out runs/formal --device cuda --calibrate
-python report.py --runs runs/formal --out results
+python project.py pipeline --root data/Trans10K --manifests data/clean_manifests --cache data/train_cache384 --validation-cache data/val_cache384 --test-cache data/test_cache384 --out runs/final --device cuda --calibrate
+python report.py --runs runs/final --out results
 ```
 
 The initial strict audit intentionally fails on the documented official cross-split duplicates. Only after checking that no other errors remain, prepare-splits creates the verified 4990/999/4428 leak-free-v1 protocol while preserving all 4428 test images. See DATA_AUDIT.md.
