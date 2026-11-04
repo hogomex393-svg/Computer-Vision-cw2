@@ -12,7 +12,7 @@
 
 ## 正在进行
 
-已逐张核对并修正 18 个训练掩膜方向异常，配方和 SHA256 在 configs/trans10k_v1_geometry.json，检查图位于 results/geometry_review_*.jpg。验证和测试集不做此类修正。四线程可恢复完整审计接近结束，目前新增错误为零；通过后建立训练、验证及鲁棒性缓存。
+已逐张核对并修正 18 个训练掩膜方向异常，配方和 SHA256 在 configs/trans10k_v1_geometry.json，检查图位于 results/geometry_review_*.jpg。验证和测试集不做此类修正。完整审计已完成：几何与标签检查通过，但官方源有 11 组跨集合完全重复。原始审计保留失败记录；独立生成 leak-free-v1 清单并验证交集为空，实际训练/验证/测试为 4990/999/4428，完整测试集保留。三个 F 盘缓存正在构建。
 
 正式训练预算为 T 与 S0～S3 各 20 个完整 epoch、seed 42；正式学生保持相同初始化和训练协议。先完成 T 的首轮计时，再恢复完整预算。验证集小范围校准单独记录，不使用测试集调参。
 
@@ -26,7 +26,7 @@
 ## 本机位置
 
 工程解释器 F:/PyLibs/cv_cw2_lib/Scripts/python.exe；干净 CPU 解释器 F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。
-数据 F:/Datasets/computer_vision/Trans10K；训练缓存 F:/Datasets/computer_vision/Trans10K_cache384。
+数据 F:/Datasets/computer_vision/Trans10K；训练缓存 F:/Datasets/computer_vision/Trans10K_train_clean384，验证缓存 F:/Datasets/computer_vision/Trans10K_val_clean384，测试缓存 F:/Datasets/computer_vision/Trans10K_test384。实际清单 data/clean_manifests。
 权重缓存 F:/Models/computer_vision/cw2。训练时设置 TORCH_HOME 与 HF_HOME 到该目录，避免写 C 盘缓存。
 合成结果 runs/smoke、artifacts/student_smoke.onnx、artifacts/smoke_demo。
 

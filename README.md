@@ -32,12 +32,15 @@ Download Trans10K v1 only from the [author's project page](https://xieenze.githu
 python -m pip install -r requirements.txt
 python download_data.py --root data/Trans10K
 python project.py audit --root data/Trans10K --out data/manifests --encoding trans10k_v1 --geometry-overrides configs/trans10k_v1_geometry.json
-python project.py cache --root data/Trans10K --manifest data/manifests/train.json --out data/train_cache384 --size 384
-python project.py cache --root data/Trans10K --manifest data/manifests/validation.json --out data/val_cache384 --size 384
-python project.py cache --root data/Trans10K --manifest data/manifests/test.json --out data/test_cache384 --size 384 --conditions clean brightness blur jpeg
-python project.py pipeline --root data/Trans10K --manifests data/manifests --cache data/train_cache384 --validation-cache data/val_cache384 --test-cache data/test_cache384 --out runs/formal --device cuda --calibrate
+python project.py prepare-splits --audit data/manifests --out data/clean_manifests
+python project.py cache --root data/Trans10K --manifest data/clean_manifests/train.json --out data/train_cache384 --size 384
+python project.py cache --root data/Trans10K --manifest data/clean_manifests/validation.json --out data/val_cache384 --size 384
+python project.py cache --root data/Trans10K --manifest data/clean_manifests/test.json --out data/test_cache384 --size 384 --conditions clean brightness blur jpeg
+python project.py pipeline --root data/Trans10K --manifests data/clean_manifests --cache data/train_cache384 --validation-cache data/val_cache384 --test-cache data/test_cache384 --out runs/formal --device cuda --calibrate
 python report.py --runs runs/formal --out results
 ```
+
+The initial strict audit intentionally fails on the documented official cross-split duplicates. Only after checking that no other errors remain, prepare-splits creates the verified 4990/999/4428 leak-free-v1 protocol while preserving all 4428 test images. See DATA_AUDIT.md.
 
 The official raw white mask value is transparent stuff, **not ignore**. See [protocol](docs/EXPERIMENTS.md) and the SHA-bound [training geometry corrections](docs/DATA_AUDIT.md). Public images, pretrained weights and trained binaries are excluded from ordinary Git commits. Official initializations are [Torchvision MobileNetV3 V2](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.mobilenet_v3_large.html) and [NVIDIA SegFormer B2](https://huggingface.co/nvidia/segformer-b2-finetuned-ade-512-512). Their caches can be set with TORCH_HOME and HF_HOME before training.
 

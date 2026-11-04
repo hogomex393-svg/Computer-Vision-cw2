@@ -82,7 +82,8 @@ def evaluate(model, root, manifest, config, device, corruption='clean', preview=
     result = metrics.result()
     result.update({'samples': len(per_image), 'corruption': corruption, 'seed': config['seed'],
                    'dataset_source': data.manifest['source'], 'split': data.manifest['split'], 'per_image': per_image,
-                   'manifest_sha256': sha256(manifest)})
+                   'manifest_sha256': sha256(manifest), 'data_protocol': data.manifest.get('protocol', 'official'),
+                   'effective_split_counts': data.manifest.get('effective_counts')})
     return result
 
 

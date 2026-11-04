@@ -35,7 +35,7 @@
       "requirement_id": "R01",
       "statement": "Dataset",
       "source": "docs/REQUIREMENTS.md",
-      "status": "current",
+      "status": "superseded",
       "supersedes": [],
       "acceptance": "docs/VALIDATION.md",
       "prohibitions": [
@@ -126,6 +126,21 @@
         "No fabricated results"
       ],
       "scope": "coursework2"
+    },
+    {
+      "requirement_id": "R01-rev1",
+      "statement": "Retain official source indices, execute verified leak-free-v1 derived manifests 4990/999/4428, preserve full test set and disclose corrections.",
+      "source": "docs/DATA_AUDIT.md; observed official archive duplicates; autonomous implementation decision under execution brief",
+      "status": "current",
+      "supersedes": [
+        "R01"
+      ],
+      "acceptance": "data/clean_manifests/audit.json passed; explicit protocol in results",
+      "prohibitions": [
+        "No original data deletion",
+        "No concealed protocol change"
+      ],
+      "scope": "coursework2"
     }
   ],
   "checkpoints": [
@@ -150,6 +165,19 @@
         "artifacts/student_smoke.json"
       ],
       "next_action": "Audit real data and run official experiments",
+      "created_at": "2026-11-04"
+    },
+    {
+      "revision": 3,
+      "item_id": "W03",
+      "state": "data audited; caches building",
+      "evidence": [
+        "data/manifests/audit.json",
+        "data/clean_manifests/audit.json",
+        "configs/trans10k_v1_geometry.json",
+        "artifacts/remote_pytest.xml"
+      ],
+      "next_action": "Complete caches and run teacher first full epoch",
       "created_at": "2026-11-04"
     }
   ],

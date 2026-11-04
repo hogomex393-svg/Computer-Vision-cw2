@@ -6,7 +6,7 @@
 
 工程代码：数据审计、MobileNetV3 学生、SegFormer 教师、边界监督、蒸馏、训练/恢复、原图评价、ONNX、OpenCV 演示和 Nano 工具已经实现。主机及干净 CPU 环境的实际测试见 docs/VALIDATION.md。
 
-真实数据：官方 train/validation/test 全部下载、CRC 校验并解压；逐张标签审计正在进行。整套标签与拆分审计完成前不宣称数据验收通过。
+真实数据：官方 train/validation/test 全部下载、CRC 校验并解压，逐张审计完成。18 个训练标签方向异常已显式修正；11 组源数据跨集合重复保留在原始失败报告中。实际实验使用独立验收通过的 leak-free-v1 清单 4990/999/4428，全部测试图保留。
 
 正式训练：T、S0、S1、S2、S3 目前 pending。已有 runs/smoke 仅为合成样本功能验证。正式 checkpoint、日志和结果将在完成后写入本文件。
 

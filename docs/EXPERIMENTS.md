@@ -23,3 +23,7 @@ Robustness: clean baseline; brightness x0.6; 7x7 Gaussian blur sigma=1.5; JPEG q
 Visual examples include fixed first manifest indices plus objectively selected lowest final-model per-image mIoU failures. Selection indices/rule are saved. Formal outputs are read from JSON; no fabricated numbers or hand-filled favorable values.
 
 Actual completion, checkpoints and measured metrics are listed in docs/PROGRESS.md and generated results/RESULTS.md. Until these exist, formal results are pending.
+
+## Actual data protocol revision
+
+The official source index is 5000/1000/4428. Full decoded-image auditing found 11 cross-split duplicate groups. Actual T/S0/S1/S2/S3 runs use the explicit leak-free-v1 derived index: 4990 train, 999 validation, 4428 test. All original test images remain; ten train and one validation examples are excluded from experiment manifests only. Eighteen training mask rotations are SHA-bound and documented in DATA_AUDIT.md. Raw data and source audit remain intact. This is a disclosed data-integrity adaptation, not an unchanged-original-protocol benchmark.

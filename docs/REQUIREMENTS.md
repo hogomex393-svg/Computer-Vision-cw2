@@ -21,3 +21,5 @@ R08: Required documents, portable install/quickstart, progress, commits and veri
 Non-goals: instance segmentation, counting, depth, GANs, heavy web frontends, paid cloud and claims of novelty for known boundary/distillation techniques.
 
 Completion levels remain separate: implemented, host-tested, real-data-trained, ONNX-verified, Nano-verified, remote-verified. Missing external conditions cannot be represented as success.
+
+R01 revision 1 (execution decision after real-data audit): retain the official source index and every source file, but use independently validated leak-free-v1 experiment manifests (4990/999/4428) because the official archives contain exact cross-split duplicates. The entire official test set is preserved. This supersedes any implication that actual fitting uses all 5000 original training entries. Record the deviation in all result summaries; do not relax the raw audit to claim it passed. Source: data/manifests/audit.json, data/clean_manifests/audit.json and docs/DATA_AUDIT.md.

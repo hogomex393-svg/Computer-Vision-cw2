@@ -132,6 +132,9 @@ def main():
     audit.add_argument('--synthetic', action='store_true')
     audit.add_argument('--geometry-overrides')
     audit.add_argument('--workers', type=int, default=4)
+    splits = sub.add_parser('prepare-splits')
+    splits.add_argument('--audit', required=True)
+    splits.add_argument('--out', required=True)
     train = sub.add_parser('train')
     train.add_argument('--config', required=True)
     train.add_argument('--root', required=True)
@@ -207,6 +210,9 @@ def main():
     elif args.command == 'audit':
         from data import audit
         result = audit(args.root, args.out, args.encoding, not args.synthetic, args.geometry_overrides, args.workers)
+    elif args.command == 'prepare-splits':
+        from data import prepare_splits
+        result = prepare_splits(args.audit, args.out)
     elif args.command == 'train':
         from learning import train
         result = train(config_file(args.config), args.root, args.manifests, args.out, args.device, args.resume,
@@ -259,6 +265,8 @@ def main():
         result = {key: value for key, value in result.items() if key != 'per_image'}
     elif args.command == 'audit':
         result = {key: result[key] for key in ('passed', 'counts', 'errors', 'journal_reused')}
+    elif args.command == 'prepare-splits':
+        result = {key: result[key] for key in ('passed', 'protocol', 'original_counts', 'counts', 'excluded')}
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

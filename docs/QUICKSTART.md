@@ -40,16 +40,16 @@ Trans10K/test/easy/images + masks
 Trans10K/test/hard/images + masks
 ```
 
-`python project.py audit --root DATA --out data/manifests --encoding trans10k_v1 --geometry-overrides configs/trans10k_v1_geometry.json` checks every image/mask pair, dimensions, actual label values, broken files, official counts and decoded image duplicates. Cross-split duplicates fail; do not silently remove public test samples or edit official splits to force success. Inspect the written audit.json first.
+`python project.py audit --root DATA --out data/manifests --encoding trans10k_v1 --geometry-overrides configs/trans10k_v1_geometry.json` checks every image/mask pair, dimensions, actual label values, broken files, official counts and decoded image duplicates. Cross-split duplicates fail. The actual official archives contain 11 such groups; after inspecting audit.json, run `python project.py prepare-splits --audit data/manifests --out data/clean_manifests`. This refuses other audit failures, keeps the original audit intact, and produces a separately named 4990/999/4428 protocol with the full test set retained.
 
-`python project.py cache --root DATA --manifest data/manifests/train.json --out CACHE --size 384` creates memory-mapped resized RGB and integer labels. Cache identity must match the audited manifest and input size. The cached and uncached augmentations are tested for exact agreement. Original-resolution evaluation always uses original images and masks.
+`python project.py cache --root DATA --manifest data/clean_manifests/train.json --out CACHE --size 384` creates memory-mapped resized RGB and integer labels. Cache identity must match the audited manifest and input size. The cached and uncached augmentations are tested for exact agreement. Original-resolution evaluation always uses original images and masks.
 
 ## Training and resuming
 
 ```bash
-python project.py train --config configs/T.json --root DATA --manifests data/manifests --cache CACHE --out runs/formal/T --device cuda --stop-after-epoch 1
-python project.py train --config configs/T.json --root DATA --manifests data/manifests --cache CACHE --out runs/formal/T --device cuda --resume
-python project.py pipeline --root DATA --manifests data/manifests --cache CACHE --out runs/formal --device cuda --calibrate
+python project.py train --config configs/T.json --root DATA --manifests data/clean_manifests --cache CACHE --out runs/formal/T --device cuda --stop-after-epoch 1
+python project.py train --config configs/T.json --root DATA --manifests data/clean_manifests --cache CACHE --out runs/formal/T --device cuda --resume
+python project.py pipeline --root DATA --manifests data/clean_manifests --cache CACHE --out runs/formal --device cuda --calibrate
 ```
 
 The first command is a full-epoch timing checkpoint within the configured 20-epoch budget, not a replacement for formal training. Resume uses the identical source/config/manifest identity. Changed code or config requires a new directory. Concurrent writers to the same run are refused.
@@ -59,12 +59,12 @@ The pipeline runs T, S0, optional validation-only calibration, then S1/S2/S3 seq
 ## Evaluation, export and demonstration
 
 ```bash
-python project.py evaluate --checkpoint runs/formal/S0/best.pt --root DATA --manifest data/manifests/test.json --out runs/formal/S0/manual_test.json --device cuda
+python project.py evaluate --checkpoint runs/formal/S0/best.pt --root DATA --manifest data/clean_manifests/test.json --out runs/formal/S0/manual_test.json --device cuda
 python project.py export --checkpoint runs/formal/S3/best.pt --out artifacts/S3_384.onnx --size 384 --opset 11
 python project.py demo --model artifacts/S3_384.onnx --source sample.jpg --out artifacts/image_demo
 python project.py demo --model artifacts/S3_384.onnx --source recording.mp4 --out artifacts/video_demo
 python project.py demo --model artifacts/S3_384.onnx --source 0 --out artifacts/camera_demo --show
-python project.py compare --baseline runs/formal/S0/best.pt --final runs/formal/S3/best.pt --root DATA --manifest data/manifests/test.json --out artifacts/comparison --device cuda
+python project.py compare --baseline runs/formal/S0/best.pt --final runs/formal/S3/best.pt --root DATA --manifest data/clean_manifests/test.json --out artifacts/comparison --device cuda
 ```
 
 Replace S3 with the validation-selected experiment from runs/formal/selection.json. Camera 0 must exist; missing sources raise an error. For the same video, run S0 then the selected model into different output directories; no simultaneous GPU inference is required. Input playback is marked separately from live camera.
@@ -76,8 +76,8 @@ Only load trusted project checkpoints: optimizer/RNG resume files use PyTorch pi
 For the full GPU run, build a clean validation cache and a test cache for all appearance conditions once:
 
 ```bash
-python project.py cache --root DATA --manifest data/manifests/validation.json --out VAL_CACHE --size 384
-python project.py cache --root DATA --manifest data/manifests/test.json --out TEST_CACHE --size 384 --conditions clean brightness blur jpeg
+python project.py cache --root DATA --manifest data/clean_manifests/validation.json --out VAL_CACHE --size 384
+python project.py cache --root DATA --manifest data/clean_manifests/test.json --out TEST_CACHE --size 384 --conditions clean brightness blur jpeg
 ```
 
 Pass `--validation-cache VAL_CACHE` to train/pipeline and `--test-cache TEST_CACHE` to pipeline. Standalone evaluate accepts `--cache TEST_CACHE`. The cached and uncached inputs are identical; original-resolution target masks and metrics are unchanged. Expect additional storage for uint8 memory-mapped arrays; no extra network download is involved.

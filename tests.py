@@ -10,7 +10,7 @@ from PIL import Image
 import pytest
 import torch
 
-from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, sha256
+from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, sha256, prepare_splits
 from learning import seed_everything, train, load_checkpoint, export_model
 from metrics import Metrics, corrupt
 from models import Student, Teacher, segmentation_loss, boundary_targets, boundary_loss, distillation_loss
@@ -170,6 +170,15 @@ def test_audit_pairing_leakage_and_unknown_values(tmp_path):
     with pytest.raises(ValueError, match='audit failed'):
         audit(root, tmp_path / 'bad_audit', 'indexed', False)
     assert any('Cross-split' in error for error in json.loads((tmp_path / 'bad_audit/audit.json').read_text())['errors'])
+    cleaned = prepare_splits(tmp_path / 'bad_audit', tmp_path / 'derived')
+    assert cleaned['counts'] == {'train': 3, 'validation': 4, 'test': 4}
+    assert cleaned['excluded']['train'] == ['train/images/smoke_000.png']
+    assert cleaned['test_preserved']
+    bad = json.loads((tmp_path / 'bad_audit/audit.json').read_text())
+    bad['errors'].append('Unknown labels')
+    (tmp_path / 'bad_audit/audit.json').write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match='non-duplicate'):
+        prepare_splits(tmp_path / 'bad_audit', tmp_path / 'refused')
 
 
 def test_train_resume_equivalence_and_config_guard(tmp_path):

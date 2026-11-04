@@ -1,0 +1,47 @@
+{
+  "checkpoint_sha256": "5996681ba2b7729e2352ad9847dc385a00617adc0f133d0bf4aecdc046d53104",
+  "onnx_sha256": "28b007d063219527bd2bbc25b8abf9327038adfc10a86e65272ae525cf1b4c2e",
+  "bytes": 12259926,
+  "opset": 11,
+  "shape": [
+    1,
+    3,
+    384,
+    384
+  ],
+  "output": "three-class float logits",
+  "smoke": true,
+  "auxiliary_removed_exact": true,
+  "comparisons": [
+    {
+      "max_abs": 1.239776611328125e-05,
+      "mean_abs": 1.6861088170117e-06,
+      "mask_agreement": 1.0
+    },
+    {
+      "max_abs": 1.239776611328125e-05,
+      "mean_abs": 1.7550634083818295e-06,
+      "mask_agreement": 1.0
+    },
+    {
+      "max_abs": 1.1444091796875e-05,
+      "mean_abs": 1.6648841665301006e-06,
+      "mask_agreement": 1.0
+    }
+  ],
+  "reference_sha256": "d0fba2626b2d9b631f256410265b550800ee8cb5e513d521a2b160edf8ff1d5d",
+  "reference_file": "student_smoke_384.reference.npz",
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "nano_verified": false
+}

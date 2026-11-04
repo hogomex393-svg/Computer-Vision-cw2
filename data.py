@@ -213,6 +213,50 @@ def _audit(root, out, encoding, official=True, geometry_overrides=None, workers=
     return report
 
 
+def prepare_splits(audit_directory, out):
+    audit_directory, out = Path(audit_directory), Path(out)
+    report = json.loads((audit_directory / 'audit.json').read_text(encoding='utf-8'))
+    manifests = {split: json.loads((audit_directory / (split + '.json')).read_text(encoding='utf-8'))
+                 for split in ('train', 'validation', 'test')}
+    groups = {}
+    for split, manifest in manifests.items():
+        for row in manifest['records']:
+            groups.setdefault(row['decoded_sha256'], set()).add(split)
+    expected_errors = {'Cross-split duplicate: ' + digest for digest, splits in groups.items() if len(splits) > 1}
+    if set(report['errors']) != expected_errors:
+        raise ValueError('Cannot prepare derived splits while non-duplicate audit failures remain')
+    original_counts = {split: len(manifest['records']) for split, manifest in manifests.items()}
+    if original_counts != report['counts']:
+        raise ValueError('Audit/manifest count mismatch')
+    if report['source'] == 'Trans10K v1' and original_counts != {'train': 5000, 'validation': 1000, 'test': 4428}:
+        raise ValueError('Official source split counts differ')
+    test_hashes = {r['decoded_sha256'] for r in manifests['test']['records']}
+    validation = [r for r in manifests['validation']['records'] if r['decoded_sha256'] not in test_hashes]
+    holdout = test_hashes | {r['decoded_sha256'] for r in validation}
+    training = [r for r in manifests['train']['records'] if r['decoded_sha256'] not in holdout]
+    active = {'train': training, 'validation': validation, 'test': manifests['test']['records']}
+    active_hashes = {split: {r['decoded_sha256'] for r in records} for split, records in active.items()}
+    if any(active_hashes[a] & active_hashes[b] for a, b in [('train', 'validation'), ('train', 'test'), ('validation', 'test')]):
+        raise AssertionError('Derived split leakage remains')
+    excluded = {split: [r['image'] for r in manifests[split]['records'] if r['image'] not in {a['image'] for a in active[split]}]
+                for split in active}
+    counts = {split: len(records) for split, records in active.items()}
+    record = {'schema': 1, 'passed': True, 'source': report['source'], 'protocol': 'leak-free-v1',
+              'source_audit_sha256': sha256(audit_directory / 'audit.json'), 'original_counts': original_counts,
+              'counts': counts, 'excluded': excluded, 'test_preserved': True,
+              'policy': 'test retained; remove test duplicates from validation; remove holdout duplicates from train',
+              'source_duplicate_groups': report['duplicates'], 'cross_split_duplicates': [],
+              'geometry_corrections': report.get('geometry_corrections', {})}
+    out.mkdir(parents=True, exist_ok=True)
+    for split, rows in active.items():
+        result = dict(manifests[split], records=rows, audit_passed=True, protocol='leak-free-v1',
+                      original_counts=original_counts, effective_counts=counts, excluded=excluded[split],
+                      source_audit_sha256=record['source_audit_sha256'])
+        (out / (split + '.json')).write_text(json.dumps(result, indent=2), encoding='utf-8')
+    (out / 'audit.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
+    return record
+
+
 class SegmentationData(Dataset):
     def __init__(self, root, manifest, size, augment=False, seed=42, mean=None, std=None, cache=None):
         self.root = Path(root)
