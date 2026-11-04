@@ -244,9 +244,34 @@ def benchmark(engine, source, output, duration=600, asynchronous=False, smoke=Fa
     return result
 
 
+def verify(engine, reference, output, atol=0.05, mean_tolerance=0.005, mask_agreement=0.995):
+    runner = TensorRTRunner(engine)
+    samples = np.load(reference, allow_pickle=False)
+    measurements = []
+    try:
+        for image, target in zip(samples['inputs'], samples['logits']):
+            predicted, _ = runner(image)
+            difference = np.abs(predicted - target)
+            row = {'max_abs': float(difference.max()), 'mean_abs': float(difference.mean()),
+                   'mask_agreement': float((predicted.argmax(1) == target.argmax(1)).mean())}
+            row['passed'] = row['max_abs'] <= atol and row['mean_abs'] <= mean_tolerance and row['mask_agreement'] >= mask_agreement
+            measurements.append(row)
+    finally:
+        runner.close()
+        samples.close()
+    result = {'engine': str(engine), 'reference_sha256': digest(reference), 'measurements': measurements,
+              'thresholds': {'max_abs': atol, 'mean_abs': mean_tolerance, 'mask_agreement': mask_agreement},
+              'passed': bool(measurements) and all(row['passed'] for row in measurements)}
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    Path(output).write_text(json.dumps(result, indent=2), encoding='utf-8')
+    if not result['passed']:
+        raise RuntimeError('TensorRT/reference alignment failed; inspect ' + str(output))
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['env', 'build', 'demo', 'benchmark', 'matrix'])
+    parser.add_argument('command', choices=['env', 'build', 'demo', 'benchmark', 'matrix', 'verify'])
     parser.add_argument('--onnx')
     parser.add_argument('--engine')
     parser.add_argument('--out', default='nano_results')
@@ -259,6 +284,7 @@ def main():
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--models-dir')
     parser.add_argument('--model-prefix', default='S3')
+    parser.add_argument('--reference')
     args = parser.parse_args()
     if args.command == 'env':
         result = environment()
@@ -268,6 +294,10 @@ def main():
         if not args.onnx or not args.engine:
             parser.error('--onnx and --engine are required')
         result = build_engine(args.onnx, args.engine, args.precision, args.workspace_mb)
+    elif args.command == 'verify':
+        if not args.engine or not args.reference:
+            parser.error('--engine and --reference are required')
+        result = verify(args.engine, args.reference, Path(args.out) / 'alignment.json')
     elif args.command == 'matrix':
         if not args.models_dir or not args.source:
             parser.error('--models-dir and --source are required')
@@ -278,6 +308,8 @@ def main():
                 engine = Path(args.out) / 'engines' / (name + '.engine')
                 build_engine(Path(args.models_dir) / ('{}_{}.onnx'.format(args.model_prefix, size)),
                              engine, precision, args.workspace_mb)
+                verify(engine, Path(args.models_dir) / ('{}_{}.reference.npz'.format(args.model_prefix, size)),
+                       Path(args.out) / name / 'alignment.json')
                 result[name] = benchmark(engine, args.source, Path(args.out) / name, args.duration, args.async_mode, args.smoke)
         (Path(args.out) / 'matrix.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
     else:

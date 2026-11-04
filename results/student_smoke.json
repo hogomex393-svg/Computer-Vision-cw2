@@ -1,0 +1,45 @@
+{
+  "checkpoint_sha256": "5996681ba2b7729e2352ad9847dc385a00617adc0f133d0bf4aecdc046d53104",
+  "onnx_sha256": "b6e00e256fe30c430a406c26a94e7dad272d0678c40882269d20cc161c83ba9e",
+  "bytes": 12259922,
+  "opset": 11,
+  "shape": [
+    1,
+    3,
+    64,
+    64
+  ],
+  "output": "three-class float logits",
+  "smoke": true,
+  "auxiliary_removed_exact": true,
+  "comparisons": [
+    {
+      "max_abs": 3.337860107421875e-06,
+      "mean_abs": 5.894244168302976e-07,
+      "mask_agreement": 1.0
+    },
+    {
+      "max_abs": 3.5762786865234375e-06,
+      "mean_abs": 7.431952440128953e-07,
+      "mask_agreement": 1.0
+    },
+    {
+      "max_abs": 3.814697265625e-06,
+      "mean_abs": 7.227617402350006e-07,
+      "mask_agreement": 1.0
+    }
+  ],
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "nano_verified": false
+}

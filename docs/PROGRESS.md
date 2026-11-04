@@ -1,31 +1,39 @@
-# Progress
+# 当前进度
 
-## Verified milestone 2
+## 已完成并验证
 
-- Core data/model/loss/metric/training/export/runtime code implemented.
-- `python -m pytest tests.py -q --basetemp artifacts/tests --junitxml=artifacts/pytest.xml`: 13 passed, 19.41 seconds.
-- Real SegFormer B0 forward and teacher-freeze gradient test passed (random weights, no accuracy claim).
-- CPU epoch-boundary resume matched uninterrupted training exactly on the tested platform.
-- CUDA synthetic run: 60 epochs / 180 updates completed. Loss 2.0881 -> 0.07437; synthetic validation mIoU 0.94790. This is colored-shape smoke data, not transparent-object accuracy.
-- Trained smoke export opset 11: max absolute difference 3.82e-6, all tested mask agreements 1.0; auxiliary head removal exact.
-- Headless images, video, bounded async capture and missing-source failures passed.
-- Nano host environment probe correctly reports target unavailable. Python 3.6 syntax check passes.
+- 工程已实现数据审计、标签转换、学生/教师、独立边界与蒸馏、训练恢复、原图评价、ONNX、图像/视频演示和 Nano 工具。
+- 项目 CUDA 环境和从公开源新安装的独立 CPU 环境均通过关键回归；最新干净环境 14 项通过，51.79 秒。日志 artifacts/clean_pytest.xml。
+- 合成样本 GPU 训练完成 60 轮、180 次更新，损失 2.0881 降至 0.07437。它只证明链路有效，不代表透明物体准确率。
+- 合成样本学生 ONNX opset 11 与 PyTorch 对齐，最大绝对误差小于 3.82e-6，测试掩膜一致率 1.0。辅助头移除后主输出完全一致。
+- 官方 Trans10K 三个压缩包全部下载、CRC 校验、解压完成。测试集中断后通过 HTTP Range 续传，不是残缺数据。
+- NVIDIA SegFormer-B2 和 Torchvision MobileNetV3 官方预训练权重已取得。384 输入、batch 4 在 RTX 4060 8GB 上通过显存/速度探测。
+- 原任务书、需求契约和实现/交接文档均已保存。已有两个本地阶段提交，尚未声称远端发布成功。
 
-## Current work
+## 正在进行
 
-Official Trans10K download and full audit; official pretrained weights and GPU budget probe; clean-environment verification; documentation and formal experiment orchestration.
+逐张审计 10428 张真实图像与掩膜，核对官方拆分、原始标签值、尺寸、损坏和跨拆分重复。通过后生成 F 盘 384 训练缓存。
 
-## Local paths
+正式训练预算为 T 与 S0～S3 各 20 个完整 epoch、seed 42；正式学生保持相同初始化和训练协议。先完成 T 的首轮计时，再恢复完整预算。验证集小范围校准单独记录，不使用测试集调参。
 
-Project interpreter: F:/PyLibs/cv_cw2_lib/Scripts/python.exe
-Data: F:/Datasets/computer_vision/Trans10K
-Weights/cache: F:/Models/computer_vision/cw2
-Smoke outputs: runs/smoke, artifacts/student_smoke.onnx, artifacts/smoke_demo
+## 下一步
 
-## External boundaries
+1. 查看 artifacts/audit_console.txt 与 data/manifests/audit.json；审计失败必须先修复或明确数据问题。
+2. 缓存完成后，以最终已测试源码运行 T 首轮，检查有限损失、真实标签和验证分数，再继续正式流水线。
+3. 完成 S0/S1/S2/S3、鲁棒性、正式 ONNX、报告图表和模型包。
+4. 上传工作分支，核对远端，再从新检出目录运行 CPU 快速验证。
 
-The user authorized proceeding with all feasible downloads and computation. GPU is available. No Nano connection is provided; no LAN scanning. GitHub target is public; only project code/docs/small results may be published. No formal trained transparent model exists yet.
+## 本机位置
 
-## Resume
+工程解释器 F:/PyLibs/cv_cw2_lib/Scripts/python.exe；干净 CPU 解释器 F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。
+数据 F:/Datasets/computer_vision/Trans10K；训练缓存 F:/Datasets/computer_vision/Trans10K_cache384。
+权重缓存 F:/Models/computer_vision/cw2。训练时设置 TORCH_HOME 与 HF_HOME 到该目录，避免写 C 盘缓存。
+合成结果 runs/smoke、artifacts/student_smoke.onnx、artifacts/smoke_demo。
 
-Read docs/VALIDATION.md and docs/work_state.json. Inspect Git status. Do not overwrite completed runs with changed code/config identities; create a new run directory. Do not mistake smoke weights for real weights.
+## 仍待真实条件
+
+未提供真实 Nano；板端 API、引擎、速度、温度、功耗、摄像头和现场录制仍待实机验证。仓库公开，不能创建私有 Release；正式模型包完成后再处理私有组内存储，不把大文件硬塞 Git。
+
+## 恢复规则
+
+先读本文件、docs/VALIDATION.md、docs/work_state.json，再查 Git 状态与活动进程。不要重建工程。训练源码、配置、清单身份变化须使用新 run 目录，不能覆盖已有实验。不得把仍在执行的正式训练写成已完成。

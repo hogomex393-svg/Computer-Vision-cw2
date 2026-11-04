@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from filelock import FileLock
 
 from data import SegmentationData, sha256
 from metrics import Metrics, corrupt
@@ -39,7 +40,7 @@ def write_json(path, value):
 
 
 def identity(config, manifests):
-    sources = {p.name: sha256(p) for p in sorted(Path(__file__).parent.glob('*.py')) if not p.name.startswith('local.')}
+    sources = {name: sha256(Path(__file__).parent / name) for name in ('data.py', 'models.py', 'metrics.py', 'learning.py', 'runtime.py')}
     records = {Path(p).name: sha256(p) for p in manifests}
     combined = {'config': config, 'sources': sources, 'manifests': records}
     digest = hashlib.sha256(json.dumps(combined, sort_keys=True).encode()).hexdigest()
@@ -94,7 +95,15 @@ def renormalize(image, source, target):
 
 
 def train(config, root, manifests, out, device='auto', resume=False, teacher_path=None, baseline_path=None,
-          stop_after_epoch=0, max_train_steps=0):
+          stop_after_epoch=0, max_train_steps=0, cache=None):
+    Path(out).mkdir(parents=True, exist_ok=True)
+    with FileLock(str(Path(out) / '.train.lock'), timeout=0):
+        return _train(config, root, manifests, out, device, resume, teacher_path, baseline_path,
+                      stop_after_epoch, max_train_steps, cache)
+
+
+def _train(config, root, manifests, out, device='auto', resume=False, teacher_path=None, baseline_path=None,
+           stop_after_epoch=0, max_train_steps=0, cache=None):
     out, manifests = Path(out), Path(manifests)
     out.mkdir(parents=True, exist_ok=True)
     if device == 'auto':
@@ -102,7 +111,8 @@ def train(config, root, manifests, out, device='auto', resume=False, teacher_pat
     config = dict(config)
     smoke = config.get('smoke', False)
     train_manifest, val_manifest = manifests / 'train.json', manifests / 'validation.json'
-    train_data = SegmentationData(root, train_manifest, config['size'], config['augment'], config['seed'])
+    train_data = SegmentationData(root, train_manifest, config['size'], config['augment'], config['seed'],
+                                  config.get('mean'), config.get('std'), cache)
     if not smoke and train_data.manifest['source'] != 'Trans10K v1':
         raise ValueError('Formal training requires audited real Trans10K v1')
     if not smoke and device == 'cpu':
@@ -161,6 +171,8 @@ def train(config, root, manifests, out, device='auto', resume=False, teacher_pat
             torch.cuda.set_rng_state_all(checkpoint['cuda_state'])
     run = {'identity': run_id, 'status': 'running', 'smoke': smoke, 'config': config, 'batch_size': batch,
            'device': device, 'provenance': provenance}
+    git = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True)
+    run['git_commit_at_start'] = git.stdout.strip() if git.returncode == 0 else 'unavailable'
     write_json(out / 'run.json', run)
     if device.startswith('cuda'):
         torch.cuda.reset_peak_memory_stats()
@@ -288,6 +300,7 @@ def export_model(checkpoint_path, out, opset=11, size=None, smoke=False):
     onnx.checker.check_model(graph)
     session = ort.InferenceSession(str(out), providers=['CPUExecutionProvider'])
     comparisons = []
+    reference_inputs, reference_logits = [], []
     for tensor in (example, torch.zeros_like(example), torch.rand_like(example) * 4 - 2):
         with torch.no_grad():
             reference = inference(tensor).numpy()
@@ -298,9 +311,14 @@ def export_model(checkpoint_path, out, opset=11, size=None, smoke=False):
         if agreement < 0.999:
             raise AssertionError('Mask agreement below 99.9%')
         comparisons.append({'max_abs': float(difference.max()), 'mean_abs': float(difference.mean()), 'mask_agreement': agreement})
+        reference_inputs.append(tensor.numpy())
+        reference_logits.append(reference)
+    reference_path = out.with_suffix('.reference.npz')
+    np.savez_compressed(reference_path, inputs=np.stack(reference_inputs), logits=np.stack(reference_logits))
     record = {'checkpoint_sha256': sha256(checkpoint_path), 'onnx_sha256': sha256(out), 'bytes': out.stat().st_size,
               'opset': opset, 'shape': [1, 3, size, size], 'output': 'three-class float logits',
               'smoke': checkpoint['smoke'], 'auxiliary_removed_exact': True, 'comparisons': comparisons,
+              'reference_sha256': sha256(reference_path), 'reference_file': reference_path.name,
               'normalization': {'mean': checkpoint['config'].get('mean', MEAN),
                                 'std': checkpoint['config'].get('std', STD)}, 'nano_verified': False}
     write_json(out.with_suffix('.json'), record)

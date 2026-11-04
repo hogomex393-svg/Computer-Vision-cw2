@@ -1,0 +1,16 @@
+# Sources and implementation decisions
+
+Checked 2026-11-04. The attached execution brief is the current project contract; the Moodle listing did not provide a CW2 attachment and is not being presented as the source of these requirements.
+
+1. [TransLAB project and official v1 downloads](https://xieenze.github.io/projects/TransLAB/TransLAB.html). Direct use: official 5000/1000/4428 splits, three classes and published download links. The legacy training stack is not reproduced.
+2. [Official Trans10K v1 loader](https://github.com/xieenze/Segment_Transparent_Objects/blob/master/segmentron/data/dataloader/trans10k.py). Adaptation: RGB channel mean 0/85/255 maps to 0/1/2. This project's strict loader uses integer channel sums 0/255/765, then separates internal ignore=255. Unknown values fail.
+3. [Trans2Seg](https://github.com/xieenze/Trans2Seg). Reference only: v2 is a different annotation taxonomy over shared images, not an independent cross-dataset test set.
+4. [SegFormer official repository](https://github.com/NVlabs/SegFormer) and [Hugging Face SegFormer documentation](https://huggingface.co/docs/transformers/model_doc/segformer). Adaptation: maintained Transformers 4.49.0 implementation, hierarchical MiT encoder and MLP decoder. B2 uses depths 3/4/6/3, widths 64/128/320/512, decoder 768. B0 fallback uses depths 2/2/2/2 and widths 32/64/160/256. No automatic architecture switch during a run.
+5. [NVIDIA B2 pretrained model](https://huggingface.co/nvidia/segformer-b2-finetuned-ade-512-512). Trusted official ADE20K initialization; new three-class head. Loading these weights alone is not Trans10K training.
+6. [Torchvision MobileNetV3-Large](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.mobilenet_v3_large.html). Direct use: ImageNet1K V2 weights, approximately 21 MB. Adaptation: feature stages are discovered and checked by measured stride/channel, not hardcoded private layer numbers. Lightweight pyramid fusion replaces classification.
+7. [Official PyTorch version pairs](https://docs.pytorch.org/get-started/previous-versions/). Actual host pair: torch 2.6.0+cu124 and torchvision 0.21.0+cu124. Do not mix unrelated torchvision versions.
+8. [NVIDIA TensorRT 8.2 Python sample](https://github.com/NVIDIA/TensorRT/blob/release/8.2/samples/python/common.py). Adaptation: explicit-batch bindings, pinned host buffers, CUDA stream and execute_async_v2. Our runner adds explicit context lifetime, cleanup, error checks, checksums and timings. No TensorRT 10/11 interface is used.
+9. [NVIDIA JetPack 4.6.4 TensorRT discussion](https://forums.developer.nvidia.com/t/installing-torch-tensorrt-on-jetson-nano/292652/6). Deployment target is original Nano with the JetPack-provided 8.2.x runtime; exact board installation must still be inspected.
+10. [TransCues paper](https://arxiv.org/abs/2512.07034), submitted December 2025, accepted WACV 2026. Research context only: boundary/reflection cues remain relevant. This coursework does not implement its reflection modules and makes no novelty or SOTA claim.
+
+All project implementation code is original integration code. No entire external repository or dataset is bundled into Git. Dataset and pretrained model use remain subject to their publishers' terms.

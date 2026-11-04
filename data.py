@@ -126,7 +126,7 @@ def audit(root, out, encoding, official=True):
 
 
 class SegmentationData(Dataset):
-    def __init__(self, root, manifest, size, augment=False, seed=42, mean=None, std=None):
+    def __init__(self, root, manifest, size, augment=False, seed=42, mean=None, std=None, cache=None):
         self.root = Path(root)
         self.manifest = json.loads(Path(manifest).read_text(encoding='utf-8'))
         if not self.manifest['audit_passed']:
@@ -134,6 +134,15 @@ class SegmentationData(Dataset):
         self.records = self.manifest['records']
         self.size, self.augment, self.seed, self.epoch = size, augment, seed, 0
         self.mean, self.std = mean, std
+        self.cache_images = self.cache_masks = self.cache_meta = None
+        if cache:
+            cache = Path(cache)
+            record = json.loads((cache / 'cache.json').read_text())
+            if record['manifest_sha256'] != sha256(manifest) or record['size'] != size:
+                raise ValueError('Cache does not match manifest/size')
+            self.cache_images = np.load(cache / 'images.npy', mmap_mode='r')
+            self.cache_masks = np.load(cache / 'masks.npy', mmap_mode='r')
+            self.cache_meta = record['geometry']
 
     def __len__(self):
         return len(self.records)
@@ -145,7 +154,13 @@ class SegmentationData(Dataset):
         return rgb, load_mask(self.root / record['mask'], self.manifest['encoding'])
 
     def __getitem__(self, index):
-        rgb, mask = self.original(index)
+        if self.cache_images is not None:
+            rgb, mask, meta = self.cache_images[index].copy(), self.cache_masks[index].copy(), self.cache_meta[index]
+        else:
+            rgb, mask = self.original(index)
+            rgb, mask, meta = letterbox(rgb, self.size, mask)
+        top, left, h, w = meta['top'], meta['left'], meta['resized_height'], meta['resized_width']
+        rgb, mask = rgb[top:top + h, left:left + w], mask[top:top + h, left:left + w]
         rng = np.random.default_rng(self.seed + self.epoch * 1000003 + index)
         if self.augment:
             if rng.random() < 0.5:
@@ -154,6 +169,30 @@ class SegmentationData(Dataset):
         rgb, mask, _ = letterbox(rgb, self.size, mask)
         kwargs = {'mean': self.mean, 'std': self.std} if self.mean is not None else {}
         return torch.from_numpy(normalize(rgb, **kwargs)), torch.from_numpy(mask.astype(np.int64))
+
+
+def prepare_cache(root, manifest, out, size):
+    out = Path(out)
+    if (out / 'cache.json').exists():
+        record = json.loads((out / 'cache.json').read_text())
+        if record['manifest_sha256'] != sha256(manifest) or record['size'] != size:
+            raise ValueError('Existing cache differs; choose a new cache directory')
+        return record
+    out.mkdir(parents=True, exist_ok=True)
+    data = SegmentationData(root, manifest, size)
+    images = np.lib.format.open_memmap(out / 'images.npy', mode='w+', dtype=np.uint8, shape=(len(data), size, size, 3))
+    masks = np.lib.format.open_memmap(out / 'masks.npy', mode='w+', dtype=np.uint8, shape=(len(data), size, size))
+    geometry = []
+    for i in range(len(data)):
+        image, mask = data.original(i)
+        images[i], masks[i], meta = letterbox(image, size, mask)
+        geometry.append(meta)
+    images.flush()
+    masks.flush()
+    record = {'manifest_sha256': sha256(manifest), 'size': size, 'geometry': geometry,
+              'source': data.manifest['source'], 'samples': len(data)}
+    (out / 'cache.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
+    return {'samples': len(data), 'size': size, 'manifest_sha256': record['manifest_sha256']}
 
 
 def synthetic(root, count=12, seed=42):

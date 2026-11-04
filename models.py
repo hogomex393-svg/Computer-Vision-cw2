@@ -115,6 +115,7 @@ def boundary_targets(mask, radius=1):
 
 
 def segmentation_loss(logits, mask):
+    logits = logits.float()
     valid = mask != 255
     if not valid.any():
         return logits.sum() * 0
@@ -134,7 +135,7 @@ def segmentation_loss(logits, mask):
 
 def boundary_loss(prediction, mask, radius):
     target, valid = boundary_targets(mask, radius)
-    values = prediction[:, 0]
+    values = prediction[:, 0].float()
     if not valid.any():
         return values.sum() * 0
     truth, pred = target[valid], values[valid]
@@ -149,7 +150,8 @@ def boundary_loss(prediction, mask, radius):
 def distillation_loss(student, teacher, mask, temperature=4.0):
     if temperature <= 0:
         raise ValueError('Temperature must be positive')
-    teacher = F.interpolate(teacher.detach(), size=student.shape[-2:], mode='bilinear', align_corners=False)
+    student = student.float()
+    teacher = F.interpolate(teacher.detach().float(), size=student.shape[-2:], mode='bilinear', align_corners=False)
     valid = mask != 255
     if not valid.any():
         return student.sum() * 0

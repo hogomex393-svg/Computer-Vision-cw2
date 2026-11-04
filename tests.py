@@ -10,7 +10,7 @@ from PIL import Image
 import pytest
 import torch
 
-from data import load_mask, synthetic, audit, SegmentationData
+from data import load_mask, synthetic, audit, SegmentationData, prepare_cache
 from learning import seed_everything, train, load_checkpoint, export_model
 from metrics import Metrics, corrupt
 from models import Student, Teacher, segmentation_loss, boundary_targets, boundary_loss, distillation_loss
@@ -118,6 +118,15 @@ def test_student_scales_initialization_and_auxiliary_removal():
     torch.testing.assert_close(logits, removed, rtol=0, atol=0)
 
 
+def test_fp16_large_reductions_remain_finite():
+    logits = torch.randn(4, 3, 384, 384, dtype=torch.float16, requires_grad=True)
+    target = torch.randint(0, 3, (4, 384, 384))
+    loss = segmentation_loss(logits, target) + distillation_loss(logits, logits.detach() + 0.1, target)
+    assert torch.isfinite(loss)
+    loss.backward()
+    assert torch.isfinite(logits.grad).all()
+
+
 def test_real_segformer_frozen_gradients():
     teacher = Teacher('b0', False).eval()
     teacher.requires_grad_(False)
@@ -140,6 +149,11 @@ def test_audit_pairing_leakage_and_unknown_values(tmp_path):
     data = SegmentationData(root, tmp_path / 'audit/train.json', 64, True)
     a, b = data[0]
     assert a.shape == (3, 64, 64) and b.shape == (64, 64)
+    prepare_cache(root, tmp_path / 'audit/train.json', tmp_path / 'cache', 64)
+    cached = SegmentationData(root, tmp_path / 'audit/train.json', 64, True, cache=tmp_path / 'cache')
+    cached_a, cached_b = cached[0]
+    torch.testing.assert_close(a, cached_a, rtol=0, atol=0)
+    torch.testing.assert_close(b, cached_b, rtol=0, atol=0)
     image = root / 'train/images/smoke_000.png'
     (root / 'validation/images/smoke_000.png').write_bytes(image.read_bytes())
     mask = root / 'train/masks/smoke_000_mask.png'

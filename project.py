@@ -38,14 +38,29 @@ def pipeline(args):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     results = {}
     for name in args.experiments:
+        if name == 'S1' and args.calibrate:
+            calibrate(args, out, device)
         config = config_file(Path(args.config_dir) / (name + '.json'))
+        if name in ('S1', 'S2', 'S3') and (out / 'calibration/selection.json').exists():
+            selected = config_file(out / 'calibration/selection.json')
+            config.update(selected['parameters'])
+        write_json(out / 'effective_configs' / (name + '.json'), config)
         run_out = out / name
         run_path = run_out / 'run.json'
         resume = run_path.exists() and config_file(run_path)['status'] != 'completed'
         record = train(config, args.root, args.manifests, run_out, device, resume,
-                       out / 'T/best.pt', out / 'S0/best_validation.json')
+                       out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache)
         if record['status'] != 'completed':
             raise RuntimeError('Pipeline stopped at incomplete experiment ' + name)
+    students = [(config_file(out / name / 'best_validation.json')['miou'], name)
+                for name in ('S0', 'S1', 'S2', 'S3') if (out / name / 'best_validation.json').exists()]
+    if len(students) == 4:
+        selected = max(students)[1]
+        write_json(out / 'selection.json', {'selected': selected, 'rule': 'highest validation mIoU; no test-based selection'})
+    for name in args.experiments:
+        run_out = out / name
+        record = config_file(run_out / 'run.json')
+        config = record['config']
         model, checkpoint = restore_model(run_out / 'best.pt', device)
         for condition in ('clean', 'brightness', 'blur', 'jpeg'):
             evaluated = evaluate(model, args.root, Path(args.manifests) / 'test.json', config, device, condition,
@@ -56,17 +71,50 @@ def pipeline(args):
         results[name] = {'validation': checkpoint['validation']['miou'],
                          'test': config_file(run_out / 'test_clean.json'), 'identity': record['identity']}
         del model
-    students = [(config_file(out / name / 'best_validation.json')['miou'], name)
-                for name in ('S0', 'S1', 'S2', 'S3') if (out / name / 'best_validation.json').exists()]
     if len(students) == 4:
-        selected = max(students)[1]
-        write_json(out / 'selection.json', {'selected': selected, 'rule': 'highest validation mIoU; no test-based selection'})
         for size in (256, 384, 512):
             export_model(out / selected / 'best.pt', out / 'exports' / ('{}_{}.onnx'.format(selected, size)), size=size)
         comparison(out / 'S0/best.pt', out / selected / 'best.pt', args.root,
                    Path(args.manifests) / 'test.json', out / 'comparison', device)
     write_json(out / 'summary.json', results)
+    from report import summarize
+    summarize(out, out / 'report')
     return results
+
+
+def calibrate(args, out, device):
+    from learning import train, write_json
+    from data import sha256
+    source = {'teacher': sha256(out / 'T/best.pt'), 'baseline_validation': sha256(out / 'S0/best_validation.json')}
+    selection = out / 'calibration/selection.json'
+    if selection.exists():
+        previous = config_file(selection)
+        if previous['source'] != source:
+            raise ValueError('Calibration inputs changed; select a new run directory')
+        return previous
+    trials = []
+    candidates = [('boundary_01', 'S1', {'lambda_boundary': 0.1}),
+                  ('boundary_02', 'S1', {'lambda_boundary': 0.2}),
+                  ('kd_T2_W025', 'S2', {'temperature': 2.0, 'lambda_kd': 0.25}),
+                  ('kd_T4_W05', 'S2', {'temperature': 4.0, 'lambda_kd': 0.5})]
+    for label, experiment, changes in candidates:
+        config = config_file(Path(args.config_dir) / (experiment + '.json'))
+        config.update(changes)
+        config.update(epochs=3, experiment='calibration_' + label)
+        trial_dir = out / 'calibration' / label
+        resume = (trial_dir / 'run.json').exists() and config_file(trial_dir / 'run.json')['status'] != 'completed'
+        run = train(config, args.root, args.manifests, trial_dir, device, resume,
+                    out / 'T/best.pt', out / 'S0/best_validation.json', cache=args.cache)
+        trials.append({'name': label, 'family': experiment, 'parameters': changes,
+                       'validation_miou': run['best_miou'], 'identity': run['identity']})
+    parameters = {}
+    for family in ('S1', 'S2'):
+        winner = max((trial for trial in trials if trial['family'] == family), key=lambda x: x['validation_miou'])
+        parameters.update(winner['parameters'])
+    record = {'source': source, 'trials': trials, 'parameters': parameters,
+              'rule': 'three full epochs per candidate; validation mIoU only; no test evaluation'}
+    write_json(selection, record)
+    return record
 
 
 def main():
@@ -93,6 +141,12 @@ def main():
     train.add_argument('--baseline-validation')
     train.add_argument('--stop-after-epoch', type=int, default=0)
     train.add_argument('--max-train-steps', type=int, default=0)
+    train.add_argument('--cache')
+    cache = sub.add_parser('cache')
+    cache.add_argument('--root', required=True)
+    cache.add_argument('--manifest', required=True)
+    cache.add_argument('--out', required=True)
+    cache.add_argument('--size', type=int, default=384)
     evaluate = sub.add_parser('evaluate')
     evaluate.add_argument('--checkpoint', required=True)
     evaluate.add_argument('--root', required=True)
@@ -132,6 +186,8 @@ def main():
     suite.add_argument('--config-dir', default='configs')
     suite.add_argument('--experiments', nargs='+', choices=['T', 'S0', 'S1', 'S2', 'S3'], default=['T', 'S0', 'S1', 'S2', 'S3'])
     suite.add_argument('--device', default='auto')
+    suite.add_argument('--cache')
+    suite.add_argument('--calibrate', action='store_true')
     args = parser.parse_args()
     if args.command == 'env':
         result = environment(args.out)
@@ -145,7 +201,10 @@ def main():
     elif args.command == 'train':
         from learning import train
         result = train(config_file(args.config), args.root, args.manifests, args.out, args.device, args.resume,
-                       args.teacher, args.baseline_validation, args.stop_after_epoch, args.max_train_steps)
+                       args.teacher, args.baseline_validation, args.stop_after_epoch, args.max_train_steps, args.cache)
+    elif args.command == 'cache':
+        from data import prepare_cache
+        result = prepare_cache(args.root, args.manifest, args.out, args.size)
     elif args.command == 'evaluate':
         from learning import restore_model, evaluate, write_json
         model, cp = restore_model(args.checkpoint, args.device)

@@ -161,7 +161,7 @@ def demo(runner, source, out, headless=True, asynchronous=False, warmup=5,
     images = sorted(p for p in path.iterdir() if p.suffix.lower() in image_types) if path.is_dir() else (
         [path] if path.suffix.lower() in image_types else [])
     capture = latest = writer = None
-    status = 'SMOKE - NOT TRAINED' if smoke else label
+    status = 'SYNTHETIC SMOKE - NOT A REAL MODEL' if smoke else label
     start_total = time.perf_counter()
     count = 0
     if path.is_dir() and not images:
@@ -206,6 +206,11 @@ def demo(runner, source, out, headless=True, asynchronous=False, warmup=5,
             mask = restore_logits(logits, meta).argmax(-1).astype(np.uint8)
             panel = np.concatenate([rgb, overlay(rgb, mask)], axis=1)
             panel = cv2.cvtColor(panel, cv2.COLOR_RGB2BGR)
+            display_width = min(1280, max(640, panel.shape[1]))
+            if display_width != panel.shape[1]:
+                display_height = max(1, int(round(panel.shape[0] * float(display_width) / panel.shape[1])))
+                panel = cv2.resize(panel, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
+            panel = cv2.copyMakeBorder(panel, 32, 0, 0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
             cv2.putText(panel, '{} | {} | {:.1f} ms'.format(status, runner.size, elapsed),
                         (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             if images:

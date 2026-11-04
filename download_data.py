@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 import json
 from pathlib import Path
 import shutil
+import time
 import zipfile
 
 import requests
@@ -28,6 +29,16 @@ class DownloadForm(HTMLParser):
 
 
 def download(root, split):
+    for attempt in range(4):
+        try:
+            return download_once(root, split)
+        except (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError):
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def download_once(root, split):
     root.mkdir(parents=True, exist_ok=True)
     archive = root / (split + '.zip')
     record = root / (split + '.download.json')
@@ -37,8 +48,11 @@ def download(root, split):
             return receipt
     url = 'https://drive.usercontent.google.com/download'
     session = requests.Session()
+    part = archive.with_suffix('.zip.part')
+    offset = part.stat().st_size if part.exists() else 0
+    headers = {'Range': 'bytes={}-'.format(offset)} if offset else {}
     response = session.get(url, params={'id': FILES[split], 'export': 'download'},
-                           stream=True, timeout=(30, 120))
+                           headers=headers, stream=True, timeout=(30, 120))
     response.raise_for_status()
     if 'text/html' in response.headers.get('Content-Type', ''):
         form = DownloadForm()
@@ -47,14 +61,24 @@ def download(root, split):
         response.close()
         if 'Virus scan warning' not in page or form.action != url:
             raise RuntimeError('Official download requires login/permission; do not save HTML as ZIP: ' + split)
-        response = session.get(url, params=form.fields, stream=True, timeout=(30, 120))
+        response = session.get(url, params=form.fields, headers=headers, stream=True, timeout=(30, 120))
         response.raise_for_status()
     if 'text/html' in response.headers.get('Content-Type', ''):
         raise RuntimeError('Download returned HTML, not the dataset: ' + split)
-    part = archive.with_suffix('.zip.part')
+    if offset and (response.status_code != 206 or not response.headers.get('Content-Range', '').startswith('bytes {}-'.format(offset))):
+        response.close()
+        raise RuntimeError('Server did not honor Range; refusing to append corrupt data. Preserve ' + str(part))
     digest = hashlib.sha256()
-    size = 0
-    with part.open('wb') as output:
+    if offset:
+        with part.open('rb') as existing:
+            magic = existing.read(4)
+            if magic != b'PK\x03\x04':
+                raise RuntimeError('Partial download has invalid ZIP magic')
+            existing.seek(0)
+            for chunk in iter(lambda: existing.read(1024 * 1024), b''):
+                digest.update(chunk)
+    size = offset
+    with part.open('ab' if offset else 'wb') as output:
         for chunk in response.iter_content(1024 * 1024):
             if not chunk:
                 continue
@@ -63,6 +87,8 @@ def download(root, split):
             output.write(chunk)
             digest.update(chunk)
             size += len(chunk)
+            if size // (256 * 1024 * 1024) != (size - len(chunk)) // (256 * 1024 * 1024):
+                print(json.dumps({'split': split, 'downloaded_bytes': size}), flush=True)
     response.close()
     with zipfile.ZipFile(part) as z:
         bad = z.testzip()
