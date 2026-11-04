@@ -25,3 +25,7 @@ Only executed checks belong here. Code existence is not a pass.
 - Formal-summary negative check: all absent experiments remain pending, no fabricated metrics.
 - Official archives passed CRC and have SHA256 receipts on F:. Test download resumed from byte 2841640960 after a broken connection, with Content-Range checked before append.
 - GPU shape probe: T 0.1204 s/step, S3 0.07135 s/step, batch 4, 384 input; random inputs and no quality claim.
+
+- GitHub authentication completed via user-approved device flow. Working branch remote SHA 7b694c31cbf16f02f1d91d2bf475b80b44b524d0 verified with ls-remote. No force push.
+- First fresh remote checkout: 10 passed, 4 setup errors because artifacts/ was absent in a clean clone. Fixed tests to initialize their output parent. Reverification follows.
+- Unicode video filename and output folder: eight frames processed successfully, output video created.

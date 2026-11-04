@@ -17,6 +17,7 @@ from models import Student, Teacher, segmentation_loss, boundary_targets, bounda
 from runtime import letterbox, preprocess, restore_logits, ONNXRunner, demo, video_path, write_image
 
 torch.set_num_threads(2)
+Path('artifacts').mkdir(exist_ok=True)
 
 
 def smoke_config(epochs=2):
