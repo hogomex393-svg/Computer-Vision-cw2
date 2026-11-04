@@ -15,23 +15,30 @@ LABELS = ['background', 'transparent_thing', 'transparent_stuff']
 
 def load_mask(path, encoding):
     with Image.open(path) as image:
-        if encoding == 'trans10k_v1':
-            a = np.asarray(image.convert('RGB'), dtype=np.uint16).sum(-1)
-            mapping = {0: 0, 255: 1, 765: 2}
-        elif encoding == 'indexed':
-            a = np.asarray(image)
-            if a.ndim != 2:
-                raise ValueError('Indexed labels must be single-channel')
-            mapping = {0: 0, 1: 1, 2: 2, 255: 255}
-        else:
-            raise ValueError('Explicit mask encoding required')
-    unknown = set(np.unique(a).tolist()) - set(mapping)
-    if unknown:
-        raise ValueError('Unknown mask values in {}: {}'.format(path, sorted(unknown)))
-    result = np.full(a.shape, 255, dtype=np.uint8)
+        return decode_mask_image(image, encoding, str(path))
+
+
+def decode_mask_image(image, encoding, name='mask'):
+    if encoding == 'trans10k_v1':
+        a = np.asarray(image.convert('RGB'), dtype=np.uint16).sum(-1, dtype=np.uint16)
+        mapping, length = {0: 0, 255: 1, 765: 2}, 766
+    elif encoding == 'indexed':
+        a = np.asarray(image)
+        if a.ndim != 2 or not np.issubdtype(a.dtype, np.integer):
+            raise ValueError('Indexed labels must be single-channel integers')
+        if a.min() < 0 or a.max() > 255:
+            raise ValueError('Unknown indexed mask values')
+        mapping, length = {0: 0, 1: 1, 2: 2, 255: 255}, 256
+    else:
+        raise ValueError('Explicit mask encoding required')
+    lookup = np.full(length, -1, np.int16)
     for raw, target in mapping.items():
-        result[a == raw] = target
-    return result
+        lookup[raw] = target
+    result = lookup[a]
+    unknown = result < 0
+    if unknown.any():
+        raise ValueError('Unknown mask values in {}: {}'.format(name, np.unique(a[unknown]).tolist()))
+    return result.astype(np.uint8)
 
 
 def sha256(path):
@@ -72,16 +79,17 @@ def audit(root, out, encoding, official=True):
                         rgb = np.asarray(image.convert('RGB'))
                     with Image.open(mask_path) as raw:
                         raw.load()
-                        arr = np.asarray(raw.convert('RGB') if encoding == 'trans10k_v1' else raw)
-                        if arr.ndim == 3:
-                            packed = arr[:, :, 0].astype(np.uint32) * 65536 + arr[:, :, 1].astype(np.uint32) * 256 + arr[:, :, 2]
-                            unique = [[int(v >> 16), int((v >> 8) & 255), int(v & 255)] for v in np.unique(packed)]
+                        colored = raw.convert('RGB') if encoding == 'trans10k_v1' else raw
+                        colors = colored.getcolors(1024)
+                        if colors is not None:
+                            unique = [list(value) if isinstance(value, tuple) else value for _, value in colors]
                         else:
-                            unique = np.unique(arr).tolist()
+                            arr = np.asarray(colored)
+                            unique = np.unique(arr.reshape(-1, 3), axis=0).tolist() if arr.ndim == 3 else np.unique(arr).tolist()
                         for v in unique:
                             key = str(v)
                             values[key] = values.get(key, 0) + 1
-                    mask = load_mask(mask_path, encoding)
+                        mask = decode_mask_image(raw, encoding, str(mask_path))
                     if rgb.shape[:2] != mask.shape:
                         raise ValueError('Image/mask dimensions differ')
                     for i, c in enumerate((0, 1, 2, 255)):
@@ -95,6 +103,8 @@ def audit(root, out, encoding, official=True):
                               'height': rgb.shape[0], 'width': rgb.shape[1], 'decoded_sha256': digest,
                               'group': location.rsplit('/', 2)[0]}
                     records.append(record)
+                    if len(records) % 100 == 0:
+                        (out / 'audit_progress.json').write_text(json.dumps({'split': split, 'processed': len(records), 'errors': len(errors)}), encoding='utf-8')
                     if len(records) <= 2:
                         preview = np.concatenate([rgb, overlay(rgb, mask)], axis=1)
                         Image.fromarray(preview).save(out / ('audit_{}_{}.png'.format(split, len(records))))

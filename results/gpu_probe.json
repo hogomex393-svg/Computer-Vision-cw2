@@ -2,15 +2,17 @@
   "T": {
     "batch": 4,
     "size": 384,
-    "step_seconds": 0.12042942500193021,
+    "step_seconds": 0.13171572500141338,
     "peak_cuda_bytes": 2707871232,
-    "probe_only": true
+    "probe_only": true,
+    "loss_finite": true
   },
   "S3": {
     "batch": 4,
     "size": 384,
-    "step_seconds": 0.07134914999915054,
+    "step_seconds": 0.0940300250040309,
     "peak_cuda_bytes": 1785531392,
-    "probe_only": true
+    "probe_only": true,
+    "loss_finite": true
   }
 }

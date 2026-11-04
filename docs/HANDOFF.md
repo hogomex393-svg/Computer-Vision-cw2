@@ -6,7 +6,7 @@
 
 工程代码：数据审计、MobileNetV3 学生、SegFormer 教师、边界监督、蒸馏、训练/恢复、原图评价、ONNX、OpenCV 演示和 Nano 工具已经实现。主机及干净 CPU 环境的实际测试见 docs/VALIDATION.md。
 
-真实数据：官方 train/validation 已下载并做 ZIP 校验；test 正在断点续传。整套标签与拆分审计完成前不宣称数据验收通过。
+真实数据：官方 train/validation/test 全部下载、CRC 校验并解压；逐张标签审计正在进行。整套标签与拆分审计完成前不宣称数据验收通过。
 
 正式训练：T、S0、S1、S2、S3 目前 pending。已有 runs/smoke 仅为合成样本功能验证。正式 checkpoint、日志和结果将在完成后写入本文件。
 
@@ -14,7 +14,7 @@
 
 Nano：环境检查、引擎构建、FP32/FP16 runner、对齐检查、视频/摄像头、计时/资源采集和十分钟矩阵脚本已实现；没有真实板卡连接，硬件验证 pending。
 
-GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作分支 codex/transparent-segmentation。远端提交与可下载权重入口须在实际上传验证后填写，当前未作成功声明。仓库公开，不自动把大模型、原始数据或原始录像放进提交。
+GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作分支 codex/transparent-segmentation。远端上传尚未完成：本地 Git 缺少 DzAsy11 登录；另一个缓存账号无此仓库权限，GitHub 连接器也返回 Resource not accessible by integration。只需补一次正确账号的官方登录，不要发送密码。仓库公开，不自动把大模型、原始数据或原始录像放进提交。
 
 ## 另外两位组员的最短接手路径
 
@@ -23,6 +23,6 @@ GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作�
 
 ## 尚需外部条件
 
-目前只确认缺少真实 Nano 及现场物件/摄像头。GPU 已在本机可用，官方数据不需账号登录，普通代码问题由 Codex 继续修复。GitHub 推送与模型包分享的权限会在实际操作时核实；出现确实不可替代的条件才补到这里。
+目前缺少真实 Nano 及现场物件/摄像头，以及 DzAsy11 的本地 GitHub 认证。GPU 已在本机可用，官方数据不需账号登录，普通代码问题由 Codex 继续修复。GitHub 推送与模型包分享的权限会在实际操作时核实；出现确实不可替代的条件才补到这里。
 
 不要从聊天里发送密码。若使用私有组内存储交付模型，只需提供获得授权的存储位置或成员访问方式；公开 GitHub 仓库不能提供私有 Release。
