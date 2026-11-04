@@ -52,3 +52,9 @@ tegrastats is collected when present. RAM, GPU utilization, temperatures and POM
 5. Real camera and local-video demonstrations; foreground overlay alignment and saved video readability.
 
 If a board failure occurs, preserve the command, complete error and environment JSON. These are implementation/compatibility issues to diagnose, not instructions for a teammate to implement missing functions.
+
+The environment receipt also records the device-tree model, physical RAM and L4T release; an aarch64 machine alone is not treated as an original Nano 4GB. Reference NPZ files are bound to the engine source by SHA256.
+
+Frame age is measured from completion of OpenCV capture/read, not from a sensor exposure timestamp. Driver buffering can add latency outside that measurement. Saved comparison videos retain the source playback FPS; measured processing throughput comes from timings/benchmark JSON, not the video's nominal FPS. Non-smoke demos visibly label IMAGE, REPLAY or LIVE.
+
+For the baseline comparison, the model package includes S0_384.onnx in addition to the selected model. Build S0_384_fp16.engine, process the same local video into a separate output directory, then run the selected model. Keep both timing JSON files and label both clips as replay.

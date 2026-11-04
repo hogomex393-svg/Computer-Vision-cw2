@@ -51,3 +51,18 @@ The existing one-epoch teacher was re-evaluated on all 999 validation images: 10
 Full regression after metric/cache changes: 20 passed in 9.27 seconds. Automatic progress preservation regression added; full suite 21 passed in 10.46 seconds.
 
 Historical runs/formal/T remains a one-epoch timing pilot. Because code identity changed, the final series starts in runs/final rather than bypassing resume guards.
+
+- Non-smoke demo labels now identify IMAGE/REPLAY/LIVE. Torch demo removes the training-only boundary head; all four synthetic demo masks matched ONNX exactly.
+- Nano environment now records device model/RAM/L4T; host probe correctly reports target unavailable. Python 3.6 syntax and progress preservation checks passed. Physical API execution remains pending.
+- Packaging rejects running or incomplete experiment sets before creating output. Guard regression passed. Draft artifact publisher is implemented and compiled; actual archive/upload/privacy-gate validation remains pending until formal model package creation.
+
+## Teacher formal completion
+
+T completed all 20 epochs / 24960 minibatches. Best whole-validation mIoU=0.9239955208. Total run time=5991.46 seconds. This is validation, not test accuracy; full test evaluation remains queued after all model/hyperparameter selections. Model states remain in runs/final/T. Small receipts are results/T_training.json, T_validation.json and T_epochs.jsonl.
+
+Training source hashes still match the recorded a2ec4a2 implementation. Subsequent changes are limited to delivery/Nano/caller orchestration and documentation.
+
+- Latest complete clean CPU suite: 23 passed in 25.37 seconds (artifacts/final_cpu_pytest.xml).
+- Delivery orchestration rejects stale checkpoint/data/corruption receipts and incomplete per-image results; focused checks passed.
+- Figure selection uses fixed first entries plus globally lowest scores from the complete clean-test result; shuffled result-order regression passed.
+- Core training source hashes remain unchanged while the active pipeline runs.

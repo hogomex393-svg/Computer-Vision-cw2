@@ -13,6 +13,90 @@ def config_file(path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig'))
 
 
+def evaluation_is_current(path, identity, checkpoint_sha, manifest_sha, condition, sample_count):
+    if not Path(path).exists():
+        return False
+    try:
+        result = config_file(path)
+        return (result.get('run_identity') == identity and result.get('checkpoint_sha256') == checkpoint_sha and
+                result.get('manifest_sha256') == manifest_sha and result.get('corruption') == condition and
+                result.get('samples') == sample_count and len(result.get('per_image', [])) == sample_count and
+                result.get('smoke') is False)
+    except (ValueError, OSError):
+        return False
+
+
+def export_is_current(path, checkpoint_sha, size):
+    from data import sha256
+    path = Path(path)
+    metadata_path, reference = path.with_suffix('.json'), path.with_suffix('.reference.npz')
+    if not all(p.is_file() for p in (path, metadata_path, reference)):
+        return False
+    try:
+        metadata = config_file(metadata_path)
+        return (metadata.get('checkpoint_sha256') == checkpoint_sha and metadata.get('shape') == [1, 3, size, size] and
+                metadata.get('opset') == 11 and metadata.get('smoke') is False and
+                metadata.get('auxiliary_removed_exact') is True and
+                metadata.get('onnx_sha256') == sha256(path) and metadata.get('reference_sha256') == sha256(reference))
+    except (ValueError, OSError):
+        return False
+
+
+def prepare_figure_manifest(manifest_path, evaluation_path, out, checkpoint_sha, limit=6):
+    from data import sha256
+    from learning import write_json
+    manifest, evaluation = config_file(manifest_path), config_file(evaluation_path)
+    if (evaluation['manifest_sha256'] != sha256(manifest_path) or
+            evaluation['checkpoint_sha256'] != checkpoint_sha or evaluation['corruption'] != 'clean' or evaluation['smoke']):
+        raise ValueError('Figure selection requires the matching complete clean-test result')
+    scores = {row['image']: row['miou'] for row in evaluation['per_image']}
+    records = manifest['records']
+    if set(scores) != {row['image'] for row in records} or evaluation['samples'] != len(records):
+        raise ValueError('Figure selection cannot use partial test results')
+    ranked = sorted((scores[row['image']] if scores[row['image']] is not None else 1, i) for i, row in enumerate(records))
+    indices = list(range(min(limit, len(records))))
+    for _, i in ranked[:limit]:
+        if i not in indices:
+            indices.append(i)
+    selected = dict(manifest, source='Trans10K v1 figure subset', split='figures_only', protocol='figure-selection-only',
+                    records=[records[i] for i in indices], full_test_indices=indices,
+                    source_manifest_sha256=sha256(manifest_path), source_evaluation_sha256=sha256(evaluation_path))
+    write_json(out, selected)
+    return indices
+
+
+def render_comparison(runs, selected, root, manifest, device):
+    from data import sha256
+    from learning import comparison, write_json
+    runs = Path(runs)
+    out = runs / 'comparison'
+    out.mkdir(parents=True, exist_ok=True)
+    expected = {'baseline_checkpoint_sha256': sha256(runs / 'S0/best.pt'),
+                'final_checkpoint_sha256': sha256(runs / selected / 'best.pt'),
+                'manifest_sha256': sha256(manifest), 'evaluation_sha256': sha256(runs / selected / 'test_clean.json')}
+    receipt_path = out / 'comparison_receipt.json'
+    if receipt_path.exists():
+        receipt = config_file(receipt_path)
+        if all(receipt.get(key) == value for key, value in expected.items()) and all(
+                (out / entry['path']).is_file() and sha256(out / entry['path']) == entry['sha256'] for entry in receipt.get('files', [])) and receipt.get('files'):
+            return receipt
+    figure_manifest = out / 'figure_manifest.json'
+    indices = prepare_figure_manifest(manifest, runs / selected / 'test_clean.json', figure_manifest, expected['final_checkpoint_sha256'])
+    comparison(runs / 'S0/best.pt', runs / selected / 'best.pt', root, figure_manifest, out, device)
+    selection = config_file(out / 'selection.json')
+    selection.update(full_test_indices=indices, fixed_global_indices=[indices[i] for i in selection['fixed_indices']],
+                     failure_global_indices=[indices[i] for i in selection['failure_indices']],
+                     final_model=selected, source_manifest_sha256=expected['manifest_sha256'],
+                     failure_rule='lowest per-image mIoU from the complete clean test, tie by original manifest index')
+    write_json(out / 'selection.json', selection)
+    names = ['selection.json', 'figure_manifest.json']
+    names += ['fixed_{:03}.png'.format(i) for i in selection['fixed_indices']]
+    names += ['failure_{:03}.png'.format(i) for i in selection['failure_indices']]
+    receipt = dict(expected, files=[{'path': name, 'sha256': sha256(out / name)} for name in names])
+    write_json(receipt_path, receipt)
+    return receipt
+
+
 def environment(out):
     import importlib.metadata as metadata
     import torch
@@ -33,7 +117,10 @@ def pipeline(args):
     try:
         result = run_pipeline(args)
         write_json(Path(args.out) / 'pipeline.json', {'status': 'completed', 'experiments': args.experiments})
-        record_progress(args.out, '主机训练、测试、导出流水线完成；模型包交付与 Nano 验收另行记录')
+        stage = ('主机训练、测试、导出流水线完成；模型包交付与 Nano 验收另行记录'
+                 if set(args.experiments) == {'T', 'S0', 'S1', 'S2', 'S3'} else
+                 '所选实验 ' + ', '.join(args.experiments) + ' 已完成；其余实验状态见列表')
+        record_progress(args.out, stage)
         return result
     except Exception as error:
         write_json(Path(args.out) / 'pipeline.json', {'status': 'failed', 'error': repr(error)})
@@ -43,6 +130,7 @@ def pipeline(args):
 
 def run_pipeline(args):
     from learning import train, restore_model, evaluate, export_model, write_json, comparison, record_progress
+    from data import sha256
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     device = args.device
@@ -71,28 +159,45 @@ def run_pipeline(args):
     if len(students) == 4:
         selected = max(students)[1]
         write_json(out / 'selection.json', {'selected': selected, 'rule': 'highest validation mIoU; no test-based selection'})
+    test_manifest = Path(args.manifests) / 'test.json'
+    test_manifest_sha = sha256(test_manifest)
+    test_samples = len(config_file(test_manifest)['records'])
     for name in args.experiments:
         run_out = out / name
         record = config_file(run_out / 'run.json')
         config = record['config']
-        model, checkpoint = restore_model(run_out / 'best.pt', device)
+        checkpoint_sha = sha256(run_out / 'best.pt')
+        model = None
         for condition in ('clean', 'brightness', 'blur', 'jpeg'):
+            evaluation_path = run_out / ('test_' + condition + '.json')
+            if evaluation_is_current(evaluation_path, record['identity'], checkpoint_sha, test_manifest_sha, condition, test_samples):
+                record_progress(out, '{}：复用已验证测试 {}'.format(name, condition))
+                continue
+            if model is None:
+                model, checkpoint = restore_model(run_out / 'best.pt', device)
+                if checkpoint['identity'] != record['identity'] or checkpoint['config'] != config:
+                    raise ValueError('Checkpoint/run provenance mismatch: ' + name)
             record_progress(out, '{}：完整测试集 {}'.format(name, condition))
-            evaluated = evaluate(model, args.root, Path(args.manifests) / 'test.json', config, device, condition,
+            evaluated = evaluate(model, args.root, test_manifest, config, device, condition,
                                  run_out / 'examples' if condition == 'clean' else None, cache=args.test_cache)
-            evaluated.update(checkpoint_sha256=__import__('data').sha256(run_out / 'best.pt'),
+            evaluated.update(checkpoint_sha256=checkpoint_sha,
                              run_identity=record['identity'], smoke=record['smoke'])
-            write_json(run_out / ('test_' + condition + '.json'), evaluated)
-        results[name] = {'validation': checkpoint['validation']['miou'],
+            write_json(evaluation_path, evaluated)
+        results[name] = {'validation': record['best_miou'],
                          'test': config_file(run_out / 'test_clean.json'), 'identity': record['identity']}
         del model
     if len(students) == 4:
-        for size in (256, 384, 512):
-            record_progress(out, '{}：导出与对齐 {}'.format(selected, size))
-            export_model(out / selected / 'best.pt', out / 'exports' / ('{}_{}.onnx'.format(selected, size)), size=size)
+        export_pairs = {(selected, size) for size in (256, 384, 512)} | {('S0', 384)}
+        checkpoint_hashes = {name: sha256(out / name / 'best.pt') for name, _ in export_pairs}
+        for name, size in sorted(export_pairs):
+            model_path = out / 'exports' / ('{}_{}.onnx'.format(name, size))
+            if export_is_current(model_path, checkpoint_hashes[name], size):
+                record_progress(out, '{}：复用已验证导出 {}'.format(name, size))
+                continue
+            record_progress(out, '{}：导出与对齐 {}'.format(name, size))
+            export_model(out / name / 'best.pt', model_path, size=size)
         record_progress(out, '生成固定案例和失败案例对照图')
-        comparison(out / 'S0/best.pt', out / selected / 'best.pt', args.root,
-                   Path(args.manifests) / 'test.json', out / 'comparison', device)
+        render_comparison(out, selected, args.root, test_manifest, device)
     write_json(out / 'summary.json', results)
     from report import summarize
     summarize(out, out / 'report')
@@ -256,11 +361,14 @@ def main():
         result = export_model(args.checkpoint, args.out, args.opset, args.size, args.smoke)
     elif args.command == 'demo':
         from runtime import demo, ONNXRunner
+        from nano import source_label
         if args.backend == 'torch':
             from learning import TorchRunner
             runner = TorchRunner(args.model, args.device)
             if runner.checkpoint['smoke'] and not args.smoke:
                 raise ValueError('Smoke checkpoint requires --smoke')
+            if runner.checkpoint['config']['kind'] == 'student':
+                runner.model.boundary_head = None
         elif args.backend == 'onnx':
             metadata = config_file(Path(args.model).with_suffix('.json'))
             if metadata['smoke'] and not args.smoke:
@@ -274,7 +382,8 @@ def main():
                 raise ValueError('Smoke engine requires --smoke')
         try:
             result = demo(runner, args.source, args.out, not args.show, args.async_capture, duration=args.duration,
-                          max_frames=args.max_frames, label=Path(args.model).stem, smoke=args.smoke, loop=args.loop)
+                          max_frames=args.max_frames, label=source_label(args.source) + ' ' + Path(args.model).stem,
+                          smoke=args.smoke, loop=args.loop)
         finally:
             runner.close()
     elif args.command == 'compare':

@@ -31,8 +31,18 @@ def command_output(command):
 
 
 def environment():
+    def read_optional(path):
+        try:
+            return Path(path).read_text(errors='replace').strip('\x00\n ')
+        except OSError:
+            return 'unavailable'
+    model = read_optional('/proc/device-tree/model')
+    memory = re.search(r'MemTotal:\s+(\d+) kB', read_optional('/proc/meminfo'))
+    memory_mib = int(memory.group(1)) / 1024.0 if memory else None
     result = {'platform': platform.platform(), 'machine': platform.machine(),
               'python': platform.python_version(), 'numpy': np.__version__,
+              'device_model': model, 'ram_total_mib': memory_mib if memory_mib is not None else 'unavailable',
+              'l4t_release': read_optional('/etc/nv_tegra_release'),
               'jetpack': command_output(['dpkg-query', '-W', 'nvidia-jetpack']),
               'power_mode': command_output(['nvpmodel', '-q']),
               'tegrastats': shutil.which('tegrastats') or 'unavailable'}
@@ -41,8 +51,19 @@ def environment():
         result['tensorrt'] = trt.__version__
     except ImportError:
         result['tensorrt'] = 'unavailable'
-    result['target_matches'] = result['machine'] == 'aarch64' and result['tensorrt'].startswith('8.')
+    result['target_matches'] = (result['machine'] == 'aarch64' and 'jetson nano' in model.lower() and
+                                'orin' not in model.lower() and memory_mib is not None and
+                                3000 <= memory_mib <= 5120 and result['tensorrt'].startswith('8.'))
     return result
+
+
+def source_label(source):
+    if str(source).isdigit():
+        return 'LIVE'
+    path = Path(str(source))
+    if path.is_dir() or path.suffix.lower() in ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff'):
+        return 'IMAGE'
+    return 'REPLAY'
 
 
 def build_engine(onnx_path, output, precision='fp16', workspace_mb=256):
@@ -81,7 +102,8 @@ def build_engine(onnx_path, output, precision='fp16', workspace_mb=256):
     record = {'onnx_sha256': metadata['onnx_sha256'], 'engine_sha256': digest(output),
               'bytes': output.stat().st_size, 'precision': precision, 'input_shape': list(shape),
               'build_seconds': time.perf_counter() - started, 'environment': environment(),
-              'smoke': metadata['smoke'], 'normalization': metadata['normalization'], 'portable': False}
+              'smoke': metadata['smoke'], 'normalization': metadata['normalization'],
+              'reference_sha256': metadata['reference_sha256'], 'portable': False}
     output.with_suffix('.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
     return record
 
@@ -221,7 +243,8 @@ def benchmark(engine, source, output, duration=600, asynchronous=False, smoke=Fa
             log = (output / 'tegrastats.log').open('w')
             process = subprocess.Popen(['tegrastats', '--interval', '1000'], stdout=log, stderr=subprocess.STDOUT)
         result = demo(runner, source, output, headless=True, asynchronous=asynchronous, warmup=30,
-                      duration=duration, label=Path(engine).stem, smoke=smoke, loop=loop and not asynchronous)
+                      duration=duration, label=source_label(source) + ' ' + Path(engine).stem,
+                      smoke=smoke, loop=loop and not asynchronous)
         result['requested_duration_seconds'] = duration
         result['sustained_duration_met'] = result['wall_seconds'] >= duration
         result['environment'] = environment()
@@ -246,9 +269,14 @@ def benchmark(engine, source, output, duration=600, asynchronous=False, smoke=Fa
 
 def verify(engine, reference, output, atol=0.05, mean_tolerance=0.005, mask_agreement=0.995):
     runner = TensorRTRunner(engine)
-    samples = np.load(reference, allow_pickle=False)
+    samples = None
     measurements = []
     try:
+        if digest(reference) != runner.metadata['reference_sha256']:
+            raise ValueError('Reference checksum does not match the built engine source')
+        samples = np.load(reference, allow_pickle=False)
+        if len(samples['inputs']) != len(samples['logits']):
+            raise ValueError('Reference sample counts differ')
         for image, target in zip(samples['inputs'], samples['logits']):
             predicted, _ = runner(image)
             difference = np.abs(predicted - target)
@@ -258,7 +286,8 @@ def verify(engine, reference, output, atol=0.05, mean_tolerance=0.005, mask_agre
             measurements.append(row)
     finally:
         runner.close()
-        samples.close()
+        if samples is not None:
+            samples.close()
     result = {'engine': str(engine), 'reference_sha256': digest(reference), 'measurements': measurements,
               'thresholds': {'max_abs': atol, 'mean_abs': mean_tolerance, 'mask_agreement': mask_agreement},
               'passed': bool(measurements) and all(row['passed'] for row in measurements)}
@@ -323,7 +352,7 @@ def main():
                 if runner.metadata['smoke'] and not args.smoke:
                     raise ValueError('Smoke engine requires --smoke')
                 result = demo(runner, args.source, args.out, not args.show, args.async_mode,
-                              label=Path(args.engine).stem, smoke=args.smoke)
+                              label=source_label(args.source) + ' ' + Path(args.engine).stem, smoke=args.smoke)
             finally:
                 runner.close()
     print(json.dumps(result, indent=2))

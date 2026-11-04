@@ -1,0 +1,96 @@
+{
+  "identity": "b261e6aebf3af250f146f2b512a68140cfc29f89db74d9cd1f6f1067964a3c37",
+  "status": "completed",
+  "smoke": false,
+  "config": {
+    "kind": "teacher",
+    "decoder_channels": 64,
+    "boundary": false,
+    "distill": false,
+    "pretrained": true,
+    "size": 384,
+    "batch_size": 4,
+    "epochs": 20,
+    "learning_rate": 6e-05,
+    "weight_decay": 0.01,
+    "seed": 42,
+    "amp": true,
+    "augment": true,
+    "freeze_bn": true,
+    "lambda_boundary": 0.2,
+    "lambda_kd": 0.5,
+    "temperature": 4.0,
+    "boundary_radius": 1,
+    "boundary_tolerance": 2,
+    "smoke": false,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "experiment": "T",
+    "variant": "b2",
+    "pretrained_source": "nvidia/segformer-b2-finetuned-ade-512-512"
+  },
+  "batch_size": 4,
+  "device": "cuda",
+  "provenance": {
+    "config": {
+      "kind": "teacher",
+      "decoder_channels": 64,
+      "boundary": false,
+      "distill": false,
+      "pretrained": true,
+      "size": 384,
+      "batch_size": 4,
+      "epochs": 20,
+      "learning_rate": 6e-05,
+      "weight_decay": 0.01,
+      "seed": 42,
+      "amp": true,
+      "augment": true,
+      "freeze_bn": true,
+      "lambda_boundary": 0.2,
+      "lambda_kd": 0.5,
+      "temperature": 4.0,
+      "boundary_radius": 1,
+      "boundary_tolerance": 2,
+      "smoke": false,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "experiment": "T",
+      "variant": "b2",
+      "pretrained_source": "nvidia/segformer-b2-finetuned-ade-512-512"
+    },
+    "sources": {
+      "data.py": "196f10d011419db82be58a9315c2d815f284f048ecf1087d05bcfd2f5d10364a",
+      "models.py": "ae4f8aea835d80ee97faa9913460001e98c95454473eda9fbd5f24e8a750f10f",
+      "metrics.py": "386d82e42a99b50bb8797eac348ddc740de6b2c2d8ae640461b5dcf2b8b3bfc4",
+      "learning.py": "c0597a767f080c6c239667bc1122f242b4e6fbc500224f0bf94014d7eaa6d348",
+      "runtime.py": "0b9f3bf00a62a38dade8553ebb8d4455325982b9c772ed56df31fa69a5055183"
+    },
+    "manifests": {
+      "train.json": "4a5798a58dc4ac65aa7924e2412bb72020ce429522df59a8a34db6d516ee3d88",
+      "validation.json": "de10378815f66456a1cc90ac39f32f134d2974749b85390cf731dbe518c8038f"
+    }
+  },
+  "last_completed_epoch": 20,
+  "global_step": 24960,
+  "best_miou": 0.9239955207704398,
+  "git_commit_at_start": "a2ec4a2a039bde48c290d2bcc5b1bf05411f2f73",
+  "elapsed_seconds": 5991.4641711,
+  "peak_cuda_bytes": 2696641536
+}

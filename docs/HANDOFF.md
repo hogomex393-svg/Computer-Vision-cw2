@@ -25,4 +25,20 @@ GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作�
 
 目前缺少真实 Nano 及现场物件/摄像头；GitHub 认证已解决。GPU 已在本机可用，官方数据不需账号登录，普通代码问题由 Codex 继续修复。GitHub 推送与模型包分享的权限会在实际操作时核实；出现确实不可替代的条件才补到这里。
 
-不要从聊天里发送密码。若使用私有组内存储交付模型，只需提供获得授权的存储位置或成员访问方式；公开 GitHub 仓库不能提供私有 Release。
+不要从聊天里发送密码。若使用私有组内存储交付模型，只需提供获得授权的存储位置或成员访问方式；公开 GitHub 仓库的已发布 Release 公开可见；本项目计划使用未发布的草稿 Release。GitHub 官方 API 文档说明，草稿仅向有推送权限的成员列出，上传工具还会先用无敏感内容的清单实际验证匿名访问被拒绝，再上传模型。
+
+## 模型包生成和组内交付
+
+正式流水线成功后使用：
+
+```bash
+python package_artifacts.py --runs runs/final --manifests data/clean_manifests --out artifacts/cw2_models_v1
+python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --check-only
+python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --account DzAsy11 --tag cw2-host-v1
+```
+
+最后一条仅创建草稿，不发布公开 Release。它使用系统 Git 已登录账号，不写入或输出凭据；固定操作本任务仓库，核对账号与推送权限。先验证草稿和清单不能匿名访问，再上传模型并核对 GitHub 服务端 SHA256。真正成功的链接与回执要等实际执行后填写，不能把工具写好当成上传完成。
+
+组员应使用有本仓库推送权限的 GitHub 账号登录草稿页下载。不要点击 Publish：发布会改变可见范围。模型包包含最佳推理 checkpoint、ONNX/数值对齐参考、实验日志和清单；完整优化器/RNG 续跑状态仍在本机各实验 last.pt。
+
+来源：[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases)。

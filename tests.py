@@ -348,3 +348,47 @@ def test_progress_updates_preserve_manual_notes(tmp_path):
     assert text.count('CV_CW2_AUTO_PROGRESS_BEGIN') == 1
     assert 'Manual note: keep the original data.' in text
     assert 'validation' in text and '1/20' in text
+
+
+def test_packaging_refuses_incomplete_experiments(tmp_path):
+    from package_artifacts import package
+    runs = tmp_path / 'runs'
+    runs.mkdir()
+    (runs / 'pipeline.json').write_text(json.dumps({'status': 'running', 'experiments': ['T']}))
+    with pytest.raises(ValueError, match='must finish'):
+        package(runs, tmp_path / 'bundle')
+    assert not (tmp_path / 'bundle').exists()
+    (runs / 'pipeline.json').write_text(json.dumps({'status': 'completed', 'experiments': ['T']}))
+    with pytest.raises(ValueError, match='All five'):
+        package(runs, tmp_path / 'bundle')
+    assert not (tmp_path / 'bundle').exists()
+
+
+def test_evaluation_reuse_rejects_partial_or_stale_results(tmp_path):
+    from project import evaluation_is_current
+    path = tmp_path / 'evaluation.json'
+    result = {'run_identity': 'run', 'checkpoint_sha256': 'weights', 'manifest_sha256': 'data',
+              'corruption': 'clean', 'samples': 2, 'per_image': [{}, {}], 'smoke': False}
+    path.write_text(json.dumps(result))
+    assert evaluation_is_current(path, 'run', 'weights', 'data', 'clean', 2)
+    assert not evaluation_is_current(path, 'run', 'other-weights', 'data', 'clean', 2)
+    assert not evaluation_is_current(path, 'run', 'weights', 'other-data', 'clean', 2)
+    assert not evaluation_is_current(path, 'run', 'weights', 'data', 'blur', 2)
+    assert not evaluation_is_current(path, 'run', 'weights', 'data', 'clean', 3)
+    result['per_image'] = [{}]
+    path.write_text(json.dumps(result))
+    assert not evaluation_is_current(path, 'run', 'weights', 'data', 'clean', 2)
+
+
+def test_figures_use_full_test_scores_without_cherry_picking(tmp_path):
+    from project import prepare_figure_manifest
+    manifest_path, evaluation_path = tmp_path / 'manifest.json', tmp_path / 'evaluation.json'
+    manifest = {'records': [{'image': name} for name in ('a', 'b', 'c', 'd', 'e')], 'audit_passed': True}
+    manifest_path.write_text(json.dumps(manifest))
+    evaluation = {'manifest_sha256': sha256(manifest_path), 'checkpoint_sha256': 'model', 'corruption': 'clean',
+                  'smoke': False, 'samples': 5, 'per_image': [{'image': name, 'miou': score} for name, score in
+                    [('e', 0.2), ('c', 0.1), ('b', 0.8), ('a', 0.9), ('d', None)]]}
+    evaluation_path.write_text(json.dumps(evaluation))
+    indices = prepare_figure_manifest(manifest_path, evaluation_path, tmp_path / 'figures.json', 'model', limit=2)
+    assert indices == [0, 1, 2, 4]
+    assert json.loads((tmp_path / 'figures.json').read_text())['split'] == 'figures_only'

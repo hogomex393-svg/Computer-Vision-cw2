@@ -13,3 +13,5 @@ GPU shape probe: B2 training, 4x3x384x384, approximately 0.120 seconds per step 
 Target Nano: no SSH address or connected device supplied. No arbitrary network scan was performed. Nano Python syntax is planned for 3.6, JetPack 4.6.x and TensorRT 8.x; actual board packages and performance remain pending.
 
 Git: installed, local commit identity configured. Provided remote is public and initially empty; API grants push. Work branch: codex/transparent-segmentation. No visibility or repository settings were changed.
+
+Power inspection during the long run: AC connected, battery 100%, active Performance plan AC sleep timeout=0 (never). These were read-only checks; no power settings were modified.
