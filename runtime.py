@@ -14,7 +14,7 @@ COLORS = np.array([[0, 0, 0], [30, 210, 100], [245, 130, 35]], dtype=np.uint8)
 
 
 def read_image(path):
-    return cv2.imdecode(np.fromfile(str(path), dtype=np.uint8), cv2.IMREAD_COLOR)
+    return cv2.imdecode(np.fromfile(str(path), dtype=np.uint8), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
 
 
 def write_image(path, image):

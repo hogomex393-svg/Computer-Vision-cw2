@@ -14,7 +14,7 @@ from data import load_mask, synthetic, audit, SegmentationData, prepare_cache, s
 from learning import seed_everything, train, load_checkpoint, export_model
 from metrics import Metrics, corrupt
 from models import Student, Teacher, segmentation_loss, boundary_targets, boundary_loss, distillation_loss
-from runtime import letterbox, preprocess, restore_logits, ONNXRunner, demo, video_path, write_image
+from runtime import letterbox, preprocess, restore_logits, ONNXRunner, demo, video_path, write_image, read_image
 
 torch.set_num_threads(2)
 Path('artifacts').mkdir(exist_ok=True)
@@ -66,6 +66,19 @@ def test_metrics_manual_and_absent_classes():
     empty = Metrics()
     empty.update(np.zeros((2, 2), int), np.full((2, 2), 255))
     assert empty.result()['miou'] is None
+
+
+def test_image_loading_uses_same_raw_grid_despite_exif(tmp_path):
+    pixels = np.zeros((20, 40, 3), np.uint8)
+    pixels[:, :20] = [230, 25, 50]
+    exif = Image.Exif()
+    exif[274] = 6
+    path = tmp_path / 'orientation.jpg'
+    Image.fromarray(pixels).save(path, exif=exif, quality=95)
+    expected = np.asarray(Image.open(path).convert('RGB'))
+    actual = cv2.cvtColor(read_image(path), cv2.COLOR_BGR2RGB)
+    assert actual.shape == expected.shape == (20, 40, 3)
+    np.testing.assert_allclose(actual, expected, atol=2)
 
 
 def test_boundary_tolerance_and_ignore_neighborhood():

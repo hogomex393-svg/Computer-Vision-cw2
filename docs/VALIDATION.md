@@ -35,3 +35,6 @@ Only executed checks belong here. Code existence is not a pass.
 - Geometry repair, hash refusal, journal reuse and truncated-tail recovery regression added. Full suite: 15 passed in 22.02 seconds.
 - Validation/corruption cache equivalence tested for clean/brightness/blur/JPEG; full suite 15 passed in 33.74 seconds.
 - 384x384 smoke export: max logit error 1.24e-5 and mask agreement 1.0; artifacts/student_smoke_384.json.
+
+- EXIF orientation consistency added: raw JPEG pixel grid matches between dataset and demo. Full regression: 16 passed in 62.17 seconds while dataset caches were being prepared.
+- Derived split validation passed: source 5000/1000/4428, effective 4990/999/4428, zero exact cross-split intersections, test set retained in full. Raw audit remains failed for its known cross-split duplicates; no assertions were disabled.
