@@ -29,6 +29,8 @@ Use the model name selected on validation, not necessarily S3. The exported logi
 
 FP16 can retain some operations in FP32 as chosen by TensorRT. INT8 is not required. If build memory is insufficient, try `--workspace-mb 128`, close unrelated board applications and compare the 256 model. Record each change; do not silently substitute input size in a benchmark.
 
+The runner rejects nonfinite logits before argmax or rendering. The host training overflow documented in NUMERICAL_FIX.md makes target FP16 verification especially important: BF16 training does not prove TensorRT FP16 compatibility. If FP16 produces invalid values or fails alignment, preserve the evidence and use the independently built FP32 engine while diagnosing the affected layer. Do not report the failed FP16 case as a speed/accuracy success.
+
 ## Timing and resources
 
 ```bash

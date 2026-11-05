@@ -108,6 +108,12 @@ def build_engine(onnx_path, output, precision='fp16', workspace_mb=256):
     return record
 
 
+def finite_logits(values):
+    if not np.isfinite(values).all():
+        raise FloatingPointError('TensorRT returned nonfinite logits; verify the engine and compare FP32 precision')
+    return values
+
+
 class TensorRTRunner:
     def __init__(self, path, asynchronous=True):
         import tensorrt as trt
@@ -193,7 +199,8 @@ class TensorRTRunner:
                 self.cuda.memcpy_dtoh(self.hosts[o], self.allocations[o])
             if not ok:
                 raise RuntimeError('TensorRT execution returned failure')
-            return self.hosts[o].reshape(self.shapes[o]).astype(np.float32).copy(), float(self.begin.time_till(self.end))
+            values = self.hosts[o].reshape(self.shapes[o]).astype(np.float32).copy()
+            return finite_logits(values), float(self.begin.time_till(self.end))
         finally:
             self.cuda_context.pop()
 

@@ -507,3 +507,13 @@ def test_delivery_refuses_partial_pipeline_and_replaces_only_its_section(tmp_pat
     assert text.count('ACTUAL_DELIVERY_BEGIN') == 1
     assert text.startswith('<!-- ACTUAL_DELIVERY_BEGIN -->')
     assert 'Manual evidence' in text and 'second' in text and 'first' not in text
+
+
+def test_nano_rejects_invalid_engine_output_before_argmax():
+    from nano import finite_logits
+    values = np.zeros((1, 3, 2, 2), dtype=np.float32)
+    assert finite_logits(values) is values
+    for invalid in (np.nan, np.inf, -np.inf):
+        values[0, 1, 0, 0] = invalid
+        with pytest.raises(FloatingPointError, match='nonfinite logits'):
+            finite_logits(values)
