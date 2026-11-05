@@ -18,14 +18,14 @@ Use the system TensorRT and OpenCV packages. Python 3.6 commonly pairs with NumP
 ## Build and run
 
 ```bash
-python3 nano.py build --onnx models/S3_384.onnx --engine models/S3_384_fp32.engine --precision fp32
-python3 nano.py build --onnx models/S3_384.onnx --engine models/S3_384_fp16.engine --precision fp16
-python3 nano.py verify --engine models/S3_384_fp16.engine --reference models/S3_384.reference.npz --out nano_results/alignment
-python3 nano.py demo --engine models/S3_384_fp16.engine --source demo.mp4 --out nano_results/playback
-python3 nano.py demo --engine models/S3_384_fp16.engine --source 0 --out nano_results/live --show
+python3 nano.py build --onnx models/S1_384.onnx --engine models/S1_384_fp32.engine --precision fp32
+python3 nano.py build --onnx models/S1_384.onnx --engine models/S1_384_fp16.engine --precision fp16
+python3 nano.py verify --engine models/S1_384_fp16.engine --reference models/S1_384.reference.npz --out nano_results/alignment
+python3 nano.py demo --engine models/S1_384_fp16.engine --source demo/input_replay.mp4 --out nano_results/playback
+python3 nano.py demo --engine models/S1_384_fp16.engine --source 0 --out nano_results/live --show
 ```
 
-Use the model name selected on validation, not necessarily S3. The exported logits are fixed [1,3,H,H]. Default ONNX opset 11 is host-tested; opset 12 is also exposed as a candidate. The board parser decides the final supported combination. Parser errors are raised with every recorded TensorRT diagnostic. Do not claim compatibility until build and execution pass on the real board.
+The completed validation protocol selected S1; the commands use its actual packaged filenames. The included demo/input_replay.mp4 is a validation still-image sequence; replace it with your own footage for scene testing. The exported logits are fixed [1,3,H,H]. Default ONNX opset 11 is host-tested; opset 12 is also exposed as a candidate. The board parser decides the final supported combination. Parser errors are raised with every recorded TensorRT diagnostic. Do not claim compatibility until build and execution pass on the real board.
 
 FP16 can retain some operations in FP32 as chosen by TensorRT. INT8 is not required. If build memory is insufficient, try `--workspace-mb 128`, close unrelated board applications and compare the 256 model. Record each change; do not silently substitute input size in a benchmark.
 
@@ -34,9 +34,9 @@ The runner rejects nonfinite logits before argmax or rendering. The host trainin
 ## Timing and resources
 
 ```bash
-python3 nano.py benchmark --engine models/S3_384_fp16.engine --source demo.mp4 --out nano_results/sync --duration 600
-python3 nano.py benchmark --engine models/S3_384_fp16.engine --source 0 --out nano_results/async --duration 600 --async-mode
-python3 nano.py matrix --models-dir models --model-prefix S3 --source demo.mp4 --out nano_results/matrix --duration 600
+python3 nano.py benchmark --engine models/S1_384_fp16.engine --source demo/input_replay.mp4 --out nano_results/sync --duration 600
+python3 nano.py benchmark --engine models/S1_384_fp16.engine --source 0 --out nano_results/async --duration 600 --async-mode
+python3 nano.py matrix --models-dir models --model-prefix S1 --source demo/input_replay.mp4 --out nano_results/matrix --duration 600
 ```
 
 The matrix performs 256/384/512 x FP32/FP16, building each engine on the Nano and running ten minutes per combination. Sync playback loops the local video to reach the requested duration. Async capture keeps at most one queued frame and reports discarded frames and frame age. Short/as-fast-as-possible video playback is not a substitute for a ten-minute live asynchronous run; an early-ended source fails the sustained-duration check.

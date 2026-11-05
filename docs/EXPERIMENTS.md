@@ -22,7 +22,7 @@ Robustness: clean baseline; brightness x0.6; 7x7 Gaussian blur sigma=1.5; JPEG q
 
 Visual examples include fixed first manifest indices plus objectively selected lowest final-model per-image mIoU failures. Selection indices/rule are saved. Formal outputs are read from JSON; no fabricated numbers or hand-filled favorable values.
 
-Actual completion, checkpoints and measured metrics are listed in docs/PROGRESS.md and generated results/RESULTS.md. Until these exist, formal results are pending.
+All five 20-epoch experiments and all 20 full-test conditions completed. The authoritative run directory is runs/final_bf16; compact measured metrics are in results/final/results.json and results/final/RESULTS.md. S1 was locked by validation before testing.
 
 ## Actual data protocol revision
 

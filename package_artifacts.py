@@ -93,7 +93,7 @@ def package(runs, output, manifests=None, demo_dir=None):
         '```bash\npython3 nano.py env --out nano_results/environment\n'
         'python3 nano.py build --onnx models/' + selected + '_384.onnx --engine models/' + selected + '_384_fp16.engine --precision fp16\n'
         'python3 nano.py verify --engine models/' + selected + '_384_fp16.engine --reference models/' + selected + '_384.reference.npz --out nano_results/alignment\n'
-        'python3 nano.py demo --engine models/' + selected + '_384_fp16.engine --source demo.mp4 --out nano_results/playback\n```\n', encoding='utf-8')
+        'python3 nano.py demo --engine models/' + selected + '_384_fp16.engine --source demo/input_replay.mp4 --out nano_results/playback\n```\n', encoding='utf-8')
     files = [{'path': str(path.relative_to(output)).replace('\\', '/'), 'bytes': path.stat().st_size, 'sha256': sha256(path)}
              for path in sorted(output.rglob('*')) if path.is_file()]
     write_json(output / 'manifest.json', {'selected': selected, 'source_commit': source_commit, 'files': files})

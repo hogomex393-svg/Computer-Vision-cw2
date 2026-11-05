@@ -210,7 +210,7 @@ def publish(archive, account, tag):
                 'Original Jetson Nano hardware validation is still pending.\n'
                 'Keep this release as a draft: publishing it makes the assets public.\n')
         response = session.post(BASE + '/releases', json={'tag_name': tag, 'target_commitish': recipe['source_commit'],
-                                'name': 'CW2 host-validated models', 'body': body, 'draft': True,
+                                'name': 'CW2 host-validated models (' + tag + ')', 'body': body, 'draft': True,
                                 'prerelease': True, 'make_latest': 'false'}, timeout=30)
         response.raise_for_status()
         release = response.json()

@@ -1,12 +1,12 @@
 # Transparent Object Segmentation for an Original Jetson Nano
 
-This is a working report draft. Only measured values from the result receipts may replace pending fields. The system is semantic segmentation, not instance segmentation or object counting.
+This report draft contains completed host experiments and measured results. The original Nano hardware section remains pending. The system is semantic segmentation, not instance segmentation or object counting.
 
 ## Objective and scope
 
 Given one RGB image, predict background, transparent things and transparent stuff at every original-resolution pixel. Transparent surfaces inherit background appearance and can have weak or misleading edges. The project studies edge deployment of a lightweight segmentation model with two established training improvements, rather than claiming an original segmentation architecture.
 
-The teacher is SegFormer-B2, a hierarchical Mix Transformer encoder with an all-MLP fusion decoder. The teacher starts from NVIDIA's ADE20K weights and receives a new three-class classifier, then must be fine-tuned on Trans10K. MobileNetV3-Large supplies the student's approximately 1/4, 1/8, 1/16 and 1/32 features. Learned 1x1 projections map them to 64 channels; bilinear upsampling, summation and depthwise/pointwise convolution fuse the pyramid. A three-channel classifier produces logits. The measured three-class B2 implementation has 27,348,931 parameters; the student inference network has 3,064,819. The auxiliary boundary head adds 18,497 parameters during training and is removed for deployment.
+The teacher is SegFormer-B2, a hierarchical Mix Transformer encoder with an all-MLP fusion decoder. The teacher starts from NVIDIA's ADE20K weights and receives a new three-class classifier, and was fine-tuned for 20 epochs on the audited Trans10K protocol. MobileNetV3-Large supplies the student's approximately 1/4, 1/8, 1/16 and 1/32 features. Learned 1x1 projections map them to 64 channels; bilinear upsampling, summation and depthwise/pointwise convolution fuse the pyramid. A three-channel classifier produces logits. The measured three-class B2 implementation has 27,348,931 parameters; the student inference network has 3,064,819. The auxiliary boundary head adds 18,497 parameters during training and is removed for deployment.
 
 ## Data and integrity
 
@@ -36,7 +36,7 @@ The teacher's output is bilinearly aligned before KL. Different normalization, i
 
 Use docs/EXPERIMENTS.md and the actual effective config files. Student initialization, input size, decoder width, data, augmentation, optimizer, seed, budget and selection rule are controlled. Small calibration choices use validation only and are recorded independently from the complete final runs. Teacher validation must exceed S0 before formal distillation.
 
-Results to insert from generated JSON: T/S0/S1/S2/S3 mIoU, each class IoU, merged foreground IoU/Dice, original-resolution boundary F1 and fixed corruption scores. Include unsuccessful/no-gain ablations as observed. No values are supplied here before measurement.
+The measured T/S0/S1/S2/S3 metrics and corruption scores are included below and in results/final/results.json. The complete candidate calibration selected boundary weight 0.2, distillation temperature 2 and distillation weight 0.25. Unsuccessful and small-gain ablations are retained.
 
 ## Deployment and optimization
 
@@ -48,9 +48,9 @@ Pure engine execution uses synchronized CUDA events. End-to-end latency includes
 
 ## Current engineering evidence
 
-Host regressions cover masks, coordinates, manually computable metrics, degenerate losses, teacher gradients, exact epoch-boundary resume, auxiliary removal, ONNX alignment and image/video/headless operation. A separately installed CPU environment runs the same checks. Synthetic colored-shape overfit results are functional diagnostics only. Formal experiment and Nano sections must be updated from docs/PROGRESS.md/results after execution, not inferred from this implementation description.
+Host regressions cover masks, coordinates, manually computable metrics, degenerate losses, teacher gradients, exact epoch-boundary resume, auxiliary removal, ONNX alignment and image/video/headless operation. A separately installed CPU environment runs the same checks. Synthetic colored-shape overfit results are functional diagnostics only. All host experiment, export, replay and remote artifact checks have now been executed. Nano performance remains unmeasured.
 
-## Limitations and conclusions pending measurements
+## Limitations
 
 RGB alone cannot fully disambiguate every transparent surface; mirrors, thin edges, clutter and severe reflections can fail. The teacher is heavier than the deployment student. Edge constraints, board thermal state and scene domain shift must be measured. This report must distinguish implemented code, real-data model quality and physical-board validation.
 
@@ -89,3 +89,18 @@ Nano latency, power, temperatures and live camera quality remain pending physica
 ![Measured accuracy and robustness](../results/final/metrics.png)
 ![Actual learning curves](../results/final/learning_curves.png)
 <!-- ACTUAL_DELIVERY_END -->
+
+
+## Interpretation of the measured results
+
+The chosen S1 student reaches 87.5862% clean-test mIoU, compared with 87.4782% for S0: a gain of 0.1079 percentage points. The larger validation gain does not transfer at the same magnitude to the held-out test set. S2 is effectively tied with S0 and is slightly lower in three-class test mIoU. S3 has the highest student clean-test mIoU, 87.6888%, but remains an ablation rather than replacing S1: selecting it after seeing test scores would violate the predefined validation-only selection rule. These small single-seed differences do not support a strong general superiority claim.
+
+The selected student is about 4.76 percentage points below the teacher on clean-test mIoU. Its inference network has 3,064,819 parameters versus 27,348,931 for the teacher; the 384 ONNX file is 12,259,926 bytes. This establishes a size/accuracy tradeoff on the host. It does not establish a Nano speedup before board measurements.
+
+The absolute boundary F1 values are low: 0.1352 for S0 and 0.1377 for S1, using the fixed two-original-pixel tolerance. High region overlap therefore does not imply precise boundaries. The 384 input grid and strict original-grid tolerance are relevant limitations, and visible edge leakage and small holes remain in the decoded replay. Neither metric definitions nor thresholds were changed after seeing test results.
+
+All six fixed examples and all six globally selected worst examples were inspected. Large clear cups and bottles usually retain their main silhouette. The worst cases expose missed broad glass planes, confusion between transparent things and transparent stuff, fragmented masks on display boxes, and false foreground on surrounding furniture. In some examples S1 is worse than S0. The failure figures remain in the report materials rather than being replaced with favorable examples.
+
+Brightness reduction is the most damaging of the three tested appearance changes for the selected student, with mIoU 0.868105 versus 0.875862 clean. The fixed blur score is slightly higher than clean, which is recorded without treating it as proof that blur is beneficial in general. These tests cover fixed synthetic transformations of the same public images, not robustness to new scenes or cameras.
+
+The three replay clips are nine-second sequences made from the same three validation images, with all 90 frames decoded successfully. Their visible timing is host ONNX Runtime timing; it is not Nano latency. Physical Nano testing and real scene recording are the remaining team tasks.
