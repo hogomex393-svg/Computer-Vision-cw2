@@ -1,0 +1,13 @@
+{
+  "repository": "hogomex393-svg/Computer-Vision-cw2",
+  "draft": true,
+  "release_url": "https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-a5fe408ef7f4e9df4648",
+  "asset_api_url": "https://api.github.com/repos/hogomex393-svg/Computer-Vision-cw2/releases/assets/712573760",
+  "browser_download_url": "https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/download/untagged-a5fe408ef7f4e9df4648/cw2_models_bf16_v1.zip",
+  "bytes": 228205341,
+  "sha256": "630a471809b1befc786e8bab8354a5fa9da9f0871a726789e81e4bec2b6cb86d",
+  "source_commit": "ee76dcda308a581c25804a5b7ddceb1e7e7de6aa",
+  "selected": "S1",
+  "anonymous_access_denied": true,
+  "access": "repository members with push permission; authenticate before downloading"
+}

@@ -1,20 +1,33 @@
+<!-- ACTUAL_DELIVERY_BEGIN -->
+## 主机实验与模型交付已完成
+
+T、S0、S1、S2、S3 均完成 20 轮；全部模型完成 4428 张原图上的四种条件测试。最终学生按验证集选择为 S1，正式模型和同一输入的 S0/最终模型演示已打包。
+
+模型包：[cw2_models_bf16_v1.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-a5fe408ef7f4e9df4648)。需要有仓库推送权限的 GitHub 账号登录；保持 Release 为草稿，不点击 Publish。
+
+体积：228205341 字节。SHA256：`630a471809b1befc786e8bab8354a5fa9da9f0871a726789e81e4bec2b6cb86d`。包内源码版本：`ee76dcda308a581c25804a5b7ddceb1e7e7de6aa`。
+
+模型包含五个最佳 checkpoint、最终学生 256/384/512 ONNX、S0 384 ONNX、对齐参考、实验记录、数据清单和验证静态图回放。已实际验证 GitHub 上传摘要、匿名访问拒绝和远端检出的 CPU 回归。
+
+仍需组员：按 JETSON.md 在原版 Nano 构建引擎、对齐和十分钟性能矩阵；按 DEMO_SCRIPT.md 做实拍。本机回放不代表 Nano 实测。
+<!-- ACTUAL_DELIVERY_END -->
+
 <!-- CV_CW2_AUTO_PROGRESS_BEGIN -->
 ## 自动运行进度
 
-更新时间：2026-11-05T08:50:13+08:00
-当前阶段：S0：验证第 5 轮
+更新时间：2026-11-05T15:58:33+08:00
+当前阶段：主机训练、测试、导出流水线完成；模型包交付与 Nano 验收另行记录
 运行目录：runs\final_bf16
 以下为最近检查点；恢复前仍需核对进程和日志。
 
 T：completed，完整轮次 20/20，最佳验证 mIoU 0.923996。
-S0：running，完整轮次 4/20，最佳验证 mIoU 0.836061。
-S1：pending，完整轮次 0/pending。
-S2：pending，完整轮次 0/pending。
-S3：pending，完整轮次 0/pending。
+S0：completed，完整轮次 20/20，最佳验证 mIoU 0.872828。
+S1：completed，完整轮次 20/20，最佳验证 mIoU 0.884096。
+S2：completed，完整轮次 20/20，最佳验证 mIoU 0.877203。
+S3：completed，完整轮次 20/20，最佳验证 mIoU 0.881062。
 
 模型训练、测试、导出与真实 Nano 验收是不同状态。
 <!-- CV_CW2_AUTO_PROGRESS_END -->
-
 # 当前任务与恢复入口
 
 用户要求完成剩余训练、测试、模型打包并整理上传 GitHub，普通问题自主解决。活动训练目录为 runs/final_bf16，顶部是自动更新的实际状态。工程 L3 主机交付仍在进行，不能称全部完成。
@@ -48,3 +61,7 @@ GPU Python F:/PyLibs/cv_cw2_lib/Scripts/python.exe；独立 CPU Python F:/PyLibs
 Nano 未提供连接；目标板引擎、FP32/FP16 数值、速度/资源/十分钟矩阵及实拍交给两位组员。主机模型和回放不冒充 Nano 实测。
 
 模型包和下载链接须以 delivery_state=completed 及 results/final/delivery.json 为准。仓库公开，模型仅进协作者草稿 Release，不发布公开 Release。课程原始任务书在 TASK_BRIEF.md，需求及版本在 REQUIREMENTS.md/work_state.json。Git 历史保留各阶段状态。
+
+## 自动续查
+
+本聊天已建立每 15 分钟续查，ID cw2，名称“完成计算机视觉 CW2 交付”。正常运行无须重复汇报；失败时继续修复，全部交付后再做实际图表/视频/包内容/远端复核并停用续查。不要把 delivery.py 的 completed 单独当成人工最终复核完成；Nano 保持未实测。收据 artifacts/continuation_automation.json。

@@ -1,3 +1,17 @@
+<!-- ACTUAL_DELIVERY_BEGIN -->
+## 主机实验与模型交付已完成
+
+T、S0、S1、S2、S3 均完成 20 轮；全部模型完成 4428 张原图上的四种条件测试。最终学生按验证集选择为 S1，正式模型和同一输入的 S0/最终模型演示已打包。
+
+模型包：[cw2_models_bf16_v1.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-a5fe408ef7f4e9df4648)。需要有仓库推送权限的 GitHub 账号登录；保持 Release 为草稿，不点击 Publish。
+
+体积：228205341 字节。SHA256：`630a471809b1befc786e8bab8354a5fa9da9f0871a726789e81e4bec2b6cb86d`。包内源码版本：`ee76dcda308a581c25804a5b7ddceb1e7e7de6aa`。
+
+模型包含五个最佳 checkpoint、最终学生 256/384/512 ONNX、S0 384 ONNX、对齐参考、实验记录、数据清单和验证静态图回放。已实际验证 GitHub 上传摘要、匿名访问拒绝和远端检出的 CPU 回归。
+
+仍需组员：按 JETSON.md 在原版 Nano 构建引擎、对齐和十分钟性能矩阵；按 DEMO_SCRIPT.md 做实拍。本机回放不代表 Nano 实测。
+<!-- ACTUAL_DELIVERY_END -->
+
 # Transparent segmentation for Jetson Nano
 
 RGB semantic segmentation of background, transparent things and transparent stuff. The deployment student is MobileNetV3-Large with a lightweight multiscale decoder. Training experiments add boundary supervision and SegFormer-B2 probability distillation independently. Known techniques are combined and evaluated for edge deployment; this is not a claim of a novel architecture.
