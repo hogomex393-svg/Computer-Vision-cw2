@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime, timezone, timedelta
 import json
 from pathlib import Path
 import shutil
@@ -106,7 +107,7 @@ def make_replay(runs, selected, video, sources, output, ffmpeg):
     return provenance
 
 
-def replace_section(path, text):
+def replace_section(path, text, prepend=False):
     path = Path(path)
     begin, end = '<!-- ACTUAL_DELIVERY_BEGIN -->', '<!-- ACTUAL_DELIVERY_END -->'
     with FileLock(str(path) + '.lock', timeout=10):
@@ -116,6 +117,8 @@ def replace_section(path, text):
             before, _, rest = original.partition(begin)
             _, _, after = rest.partition(end)
             text = before + section + after
+        elif prepend:
+            text = section + '\n\n' + original
         else:
             text = original.rstrip() + '\n\n' + section + '\n'
         path.write_text(text, encoding='utf-8')
@@ -262,12 +265,38 @@ def main():
                        '仍需组员：按 JETSON.md 在原版 Nano 构建引擎、对齐和十分钟性能矩阵；按 DEMO_SCRIPT.md 做实拍。'
                        '本机回放不代表 Nano 实测。')
             for path in ('docs/HANDOFF.md', 'docs/PROGRESS.md', 'README.md'):
-                replace_section(path, message)
-            final_commit = commit_and_push(['results/final/delivery.json', 'docs/HANDOFF.md', 'docs/PROGRESS.md', 'README.md'],
+                replace_section(path, message, prepend=True)
+            state = config_file('docs/work_state.json')
+            state.update(status='complete', current_item_id=None,
+                         completion_scope='Host L3 training, evaluation, ONNX, replay and verified GitHub handoff; original Nano hardware acceptance remains external')
+            for item in state['items']:
+                item['status'] = 'completed'
+            state['gates'].update(disabled_release='passed', real_acceptance='passed')
+            state['external_acceptance'] = {'nano_hardware': 'pending_no_connection', 'live_filming': 'pending_team_capture'}
+            state['checkpoints'].append({'revision': max(c['revision'] for c in state['checkpoints']) + 1,
+                'item_id': 'W04', 'state': 'Complete host L3 delivery; target Nano is explicitly unverified',
+                'evidence': ['results/final/results.json', 'results/final/delivery.json', str(output / 'remote_pytest.txt'),
+                             uploaded['release_url'], uploaded['sha256']],
+                'next_action': 'Team executes original-Nano validation and live filming using the documented commands',
+                'created_at': datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')})
+            write_json('docs/work_state.json', state)
+            stage('committing_final_handoff')
+            final_commit = commit_and_push(['results/final/delivery.json', 'docs/HANDOFF.md', 'docs/PROGRESS.md', 'docs/work_state.json', 'README.md'],
                                            'docs: publish verified collaborator model handoff')
             stage('completed', selected=selected, source_commit=uploaded['source_commit'], final_commit=final_commit,
                   release_url=uploaded['release_url'], sha256=uploaded['sha256'], nano_hardware_verified=False)
         except Exception as error:
+            if state_path.exists() and config_file(state_path).get('stage') == 'committing_final_handoff':
+                state = config_file('docs/work_state.json')
+                state.update(status='active', current_item_id='W04')
+                for item in state['items']:
+                    if item['item_id'] == 'W04':
+                        item['status'] = 'in_progress'
+                state['checkpoints'].append({'revision': max(c['revision'] for c in state['checkpoints']) + 1,
+                    'item_id': 'W04', 'state': 'Model assets verified; final handoff documentation push failed',
+                    'evidence': [str(state_path)], 'next_action': 'Resolve the recorded Git failure and finish normal push',
+                    'created_at': datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')})
+                write_json('docs/work_state.json', state)
             stage('failed', error=repr(error))
             raise
 

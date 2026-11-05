@@ -501,8 +501,9 @@ def test_delivery_refuses_partial_pipeline_and_replaces_only_its_section(tmp_pat
         verify_results(runs, tmp_path / 'manifests')
     note = tmp_path / 'notes.md'
     note.write_text('Manual evidence\n', encoding='utf-8')
-    replace_section(note, 'first')
+    replace_section(note, 'first', prepend=True)
     replace_section(note, 'second')
     text = note.read_text(encoding='utf-8')
     assert text.count('ACTUAL_DELIVERY_BEGIN') == 1
+    assert text.startswith('<!-- ACTUAL_DELIVERY_BEGIN -->')
     assert 'Manual evidence' in text and 'second' in text and 'first' not in text

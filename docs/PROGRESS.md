@@ -1,13 +1,13 @@
 <!-- CV_CW2_AUTO_PROGRESS_BEGIN -->
 ## 自动运行进度
 
-更新时间：2026-11-05T08:17:20+08:00
-当前阶段：流水线失败：Nonfinite training loss
-运行目录：runs\final
+更新时间：2026-11-05T08:50:13+08:00
+当前阶段：S0：验证第 5 轮
+运行目录：runs\final_bf16
 以下为最近检查点；恢复前仍需核对进程和日志。
 
 T：completed，完整轮次 20/20，最佳验证 mIoU 0.923996。
-S0：completed，完整轮次 20/20，最佳验证 mIoU 0.877504。
+S0：running，完整轮次 4/20，最佳验证 mIoU 0.836061。
 S1：pending，完整轮次 0/pending。
 S2：pending，完整轮次 0/pending。
 S3：pending，完整轮次 0/pending。
@@ -15,66 +15,36 @@ S3：pending，完整轮次 0/pending。
 模型训练、测试、导出与真实 Nano 验收是不同状态。
 <!-- CV_CW2_AUTO_PROGRESS_END -->
 
+# 当前任务与恢复入口
 
+用户要求完成剩余训练、测试、模型打包并整理上传 GitHub，普通问题自主解决。活动训练目录为 runs/final_bf16，顶部是自动更新的实际状态。工程 L3 主机交付仍在进行，不能称全部完成。
 
+## 当前执行链
 
+1. 隐藏 GPU 流水线按 T、S0、参数校准、S1、S2、S3、全部模型完整测试、ONNX、案例图顺序运行。T 从已完成的 runs/final/T 原样核验复制；四个学生统一 BF16、seed 42、384 输入、每组 20 轮。训练源码于 6902a18 冻结，后续改动只在交付工具和文档。
+2. 隐藏 delivery.py 等待该流水线成功。它核对五组实验、每张测试图覆盖、全部条件、验证集选模及导出，再生成同一验证静态图回放的 S0/最终输出、报告与小型图表。
+3. --upload 明确授权的收尾仅操作指定 GitHub 仓库与工作分支：正常提交、远端核对、独立检出 CPU 测试、模型和演示包内部校验、草稿 Release 匿名拒绝检查、上传摘要核验，最后更新交接首页和工作状态。失败会记录并停止，不写成成功。
 
+训练日志 artifacts/final_bf16.stdout.log / stderr.log，启动回执 artifacts/final_bf16_launch.json。交付日志 artifacts/delivery_bf16.stdout.log / stderr.log，状态 artifacts/delivery_bf16/delivery_state.json，启动回执 artifacts/delivery_bf16_launch.json。恢复前必须检查这些文件和实际进程，禁止重复启动。
 
+## 已验证事实
 
+官方 Trans10K 三个压缩包全部下载、CRC 校验、解压、逐张审计。18 个训练标签方向修正不改原始文件。11 组跨集合完全重复导致采用独立 leak-free-v1 清单 4990/999/4428；完整测试集保留。各条件缓存和原图掩膜无损缓存已完成。
 
+教师完成 20 轮，最佳验证 mIoU=0.9239955207704398。旧 FP16 S0 完成 20 轮，0.8775038527093654 仅作为历史记录，不与新 BF16 学生混入同一消融。新 S0 首轮后导出预检通过，三组掩膜一致率 1.0，最大误差 1.15e-5 以下；不是最终模型验收。
 
+FP16 蒸馏失败已定位到 encoder.16.0 前向溢出，FP32 中间幅度 67143.6796875 大于 FP16 最大值 65504。保存的实际失败批次在 BF16 下前向与梯度均有限。四个学生及全部校准因此在新目录统一重跑。完整证据与论文报告解释在 NUMERICAL_FIX.md；旧运行和失败张量保留在 runs/final。
 
-# 项目进度与恢复入口
+完整 CPU 回归 27 项通过；后续交付守卫检查通过。真实 90 帧回放生成已用旧训练 S0 验证，包含 H.264 输出、计时和来源 SHA。GitHub DzAsy11 的 API 身份和 push 权限已实际通过，凭据不进入文件。
 
-## 已完成
+## 恢复命令
 
-数据审计、模型与损失、训练恢复、原图评价、ONNX、OpenCV 演示和 Nano 工具均已实现。独立 CPU 环境的完整回归已有 23 项通过；2026-11-05 新增模型包完整性与 Nano 结果真实性检查通过，详见 VALIDATION.md。
+GPU Python F:/PyLibs/cv_cw2_lib/Scripts/python.exe；独立 CPU Python F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。TORCH_HOME=F:/Models/computer_vision/cw2/torch，HF_HOME=F:/Models/computer_vision/cw2/huggingface，HF_HUB_OFFLINE=1。
 
-官方 Trans10K 三个压缩包全部下载、CRC 校验并解压。18 个训练掩膜方向异常按 SHA 绑定配方在加载时修正，原始数据不改。官方划分有 11 组跨集合重复；实际实验采用 leak-free-v1 清单 4990/999/4428，保留完整测试集。训练、验证、四种测试条件的缓存以及原图掩膜无损缓存均已完成。
+训练完整参数在 artifacts/final_bf16_launch.json，包含 --out runs/final_bf16 --teacher-run runs/final/T --calibrate。交付完整参数在 artifacts/delivery_bf16_launch.json。确认没有活动进程后才恢复。模型/数据/核心训练代码身份改变不能绕过 guard；第一轮失败且无 last.pt 时先保留失败目录。
 
-正式系列 runs/final 中，T 和 S0 都完成 20 个完整 epoch。最佳验证 mIoU：T=0.9239955207704398，S0=0.8775038527093654。边界校准两个候选均完成 3 轮，lambda=0.1/0.2 对应 0.8239747173978853/0.8259085263637763；最终参数须等蒸馏候选也完成再统一选择。
+## 真实外部条件
 
-真实 S0 的 384 ONNX 已导出并通过数值对齐，最大误差小于 4.08e-5，三组掩膜一致率均为 1.0。真实验证图片预览 artifacts/S0_validation_preview.png；九秒验证静态图回放 artifacts/S0_validation_replay.mp4。回放不代表实时摄像头或 Nano 性能。
+Nano 未提供连接；目标板引擎、FP32/FP16 数值、速度/资源/十分钟矩阵及实拍交给两位组员。主机模型和回放不冒充 Nano 实测。
 
-GitHub 工作分支已实际推送。当前已核对的远端版本 305bf144d9a31e216d5ea4608a146504bbe20727；训练核心源码身份为 a2ec4a2 对应的五个文件 SHA。后续正常提交不覆盖已有历史。
-
-## 当前恢复点
-
-2026-11-05 00:35:41，第一项蒸馏校准在第一个 epoch 出现 Nonfinite training loss，流程按设计失败退出。失败记录完整保留在 runs/failed_kd_20261105_003541，原日志 artifacts/final_pipeline.stdout.log 与 stderr.log。没有伪造完成轮次，也未删除已经完成的 T、S0 和边界校准。
-
-独立诊断重放全部 1248 个训练批次未复现，证据 artifacts/kd_failure_diagnosis.json；根因尚未确认。08:05 使用相同训练源码、配置、数据重新执行正式 pipeline。local.retry_pipeline.py 只在实际异常退出后读取失败栈并保存张量现场，不改变训练计算；启动回执 artifacts/final_retry_launch.json。运行状态以顶部自动记录、run.json、实际进程和日志为准。
-
-当前日志：artifacts/final_pipeline_retry.stdout.log / stderr.log。若再次异常，检查 artifacts/kd_production_failure.json 与 kd_production_failure_batch.pt。禁止在没有证据时将重试称为根因修复。
-
-## 下一步
-
-1. 完成蒸馏校准，继续 S1、S2、S3 各 20 轮。全部学生的主干初始化、数据、预算及选模协议保持一致。
-2. 全部五组在 4428 张测试图上完成干净/亮度/模糊/JPEG 评价；最终学生只按验证集选择。
-3. 完成最终学生 256/384/512 与 S0 384 导出、案例图、演示和报告；模型包通过内容与 SHA 核验后上传仅协作者可访问的草稿 Release。
-4. 正常提交并核对远端，在新的检出目录运行 CPU 验证。
-
-## 运行位置与命令
-
-GPU Python：F:/PyLibs/cv_cw2_lib/Scripts/python.exe。独立 CPU Python：F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。
-原始数据 F:/Datasets/computer_vision/Trans10K。缓存分别为 Trans10K_train_clean384、Trans10K_val_clean384、Trans10K_test384。实际清单 data/clean_manifests。
-权重缓存通过 TORCH_HOME=F:/Models/computer_vision/cw2/torch、HF_HOME=F:/Models/computer_vision/cw2/huggingface 指定；已有权重时设置 HF_HUB_OFFLINE=1。
-
-```powershell
-python project.py pipeline --root F:/Datasets/computer_vision/Trans10K --manifests data/clean_manifests --cache F:/Datasets/computer_vision/Trans10K_train_clean384 --validation-cache F:/Datasets/computer_vision/Trans10K_val_clean384 --test-cache F:/Datasets/computer_vision/Trans10K_test384 --out runs/final --device cuda --calibrate
-```
-
-恢复前先检查进程，不能重复启动。完成的实验按身份校验后复用；未完成实验只能从已保存 epoch 边界恢复。若失败发生在第一个 epoch 且无 last.pt，先保留失败目录，不能假装存在可恢复 checkpoint。训练核心源码、配置或清单身份变化须用新目录，不绕过身份核对。
-
-runs/formal/T 是一个 epoch 的性能 pilot，runs/smoke 是合成功能验证，两者不属于正式系列。原图评价优化已在完整 999 张验证图上核实所有指标、混淆矩阵、有效像素与旧实现完全一致，证据 results/optimized_validation_equivalence.json。
-
-## 外部条件与交付边界
-
-GitHub 认证、GPU 和数据已解决。缺少真实原版 Nano 连接及现场物件/摄像头，板端速度、温度、功耗、实拍和最终录像仍需组员完成；不能用 PC 或回放代替。
-
-源码和小型结果已上传；正式模型包尚未生成、上传。目标仓库公开，采用草稿 Release 组内交付，先用非敏感清单核实匿名拒绝，再上传并核对模型摘要。不能将草稿发布为公开 Release。具体接手步骤见 HANDOFF.md。
-
-恢复补记：2026-11-05 08:09:37，蒸馏首个候选完成第 1 轮及完整验证，1248 批次，validation mIoU=0.7220648037307335。第 2 轮已启动。失败暂未复现，根因仍未确认；已有 last.pt 可从 epoch 边界恢复。
-
-## 2026-11-05 精度问题已定位，正式系列修订
-
-第二次失败已定位为 encoder.16.0 的 FP16 前向溢出。实际失败批次在 BF16 下前向及梯度均有限。四个学生及全部校准统一重跑，活动目录改为 runs/final_bf16，教师从 runs/final/T 核验后原样复用。旧 S0 的 87.75% 为历史 FP16 结果，不进入新协议的正式比较。完整 CPU 回归 27 项通过。细节见 NUMERICAL_FIX.md；下一步启动修订后的完整流水线。
+模型包和下载链接须以 delivery_state=completed 及 results/final/delivery.json 为准。仓库公开，模型仅进协作者草稿 Release，不发布公开 Release。课程原始任务书在 TASK_BRIEF.md，需求及版本在 REQUIREMENTS.md/work_state.json。Git 历史保留各阶段状态。
