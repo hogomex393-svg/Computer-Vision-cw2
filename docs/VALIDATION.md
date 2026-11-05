@@ -1,6 +1,16 @@
 # Validation log
 
-Only executed checks belong here. Code existence is not a pass.
+The final host checks are summarized below; subsequent sections preserve the chronological history, including earlier pending states and failures.
+
+## Final host verification (2026-11-05T16:22:56+08:00)
+
+All five 20-epoch runs, all 20 full-test conditions and four formal exports passed provenance checks. Every test condition contains exactly 4428 source paths. The 29-test clean CPU suite passed from the final artifact source commit 34530d7915c3691b606653d6158a23111fe45248 in 15.69 seconds; receipt artifacts/delivery_bf16/remote_check_ee76dcda308a/artifacts/final_v2_pytest.xml records that actual checkout identity.
+
+All 90 frames of each of the three H.264 replay clips decoded. The assistant visually inspected all three scenes in both model outputs, six fixed test cases, six global failures and both result plots. Limitations are described in REPORT_DRAFT.md. This is assistant content review, not physical Nano or human scene acceptance.
+
+The v2 archive has 68 verified members, 228205346 bytes and SHA256 b0f1b57f60c25cc8c54d8284ee97b0b8073b8b58730318cb6392106428eb4246. ZIP content checks and all replay command paths passed. A full authenticated GitHub download matched every byte by SHA256; anonymous access was denied. v2 changes only ARTIFACTS.md and package provenance relative to v1; every model, metric and video payload has the same digest. Final receipts: results/final/FINAL_REVIEW.json and results/final/delivery.json.
+
+## Historical execution log
 
 - Initial CUDA probe in existing environment: PyTorch 2.6.0+cu124, CUDA tensor allocation passed; RTX 4060 Laptop 8GB.
 - Git ls-remote target: exit 0, no refs (empty repository).

@@ -1,22 +1,18 @@
 <!-- ACTUAL_DELIVERY_BEGIN -->
-## 主机实验与模型交付已完成
+## 已完成主机训练、测试与模型交付
 
-T、S0、S1、S2、S3 均完成 20 轮；全部模型完成 4428 张原图上的四种条件测试。最终学生按验证集选择为 S1，正式模型和同一输入的 S0/最终模型演示已打包。
+五个模型各 20 轮；20 组完整测试；正式 ONNX 数值对齐；真实模型回放与报告；独立远端 CPU 回归 29 项通过。Nano 实机验证与现场录制待组员完成。
 
-模型包：[cw2_models_bf16_v1.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-a5fe408ef7f4e9df4648)。需要有仓库推送权限的 GitHub 账号登录；保持 Release 为草稿，不点击 Publish。
+当前模型包：[cw2_models_bf16_v2.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-249e98c24b10a87ef648)，约 228 MB，需要仓库协作者账号登录，保持 Release 为草稿。已完整下载核对 SHA256，并验证匿名访问拒绝。模型包源码版本 `34530d7915c3691b606653d6158a23111fe45248`。
 
-体积：228205341 字节。SHA256：`630a471809b1befc786e8bab8354a5fa9da9f0871a726789e81e4bec2b6cb86d`。包内源码版本：`ee76dcda308a581c25804a5b7ddceb1e7e7de6aa`。
-
-模型包含五个最佳 checkpoint、最终学生 256/384/512 ONNX、S0 384 ONNX、对齐参考、实验记录、数据清单和验证静态图回放。已实际验证 GitHub 上传摘要、匿名访问拒绝和远端检出的 CPU 回归。
-
-仍需组员：按 JETSON.md 在原版 Nano 构建引擎、对齐和十分钟性能矩阵；按 DEMO_SCRIPT.md 做实拍。本机回放不代表 Nano 实测。
+部署模型 S1 按验证集选定，干净测试 mIoU 87.5862%；基线 S0 为 87.4782%。改进幅度小，全部消融、失败案例和局限已保留。详见 [交接与下载](docs/HANDOFF.md)、[实际结果](results/final/RESULTS.md)、[报告](docs/REPORT_DRAFT.md) 和 [最终复核](results/final/FINAL_REVIEW.json)。
 <!-- ACTUAL_DELIVERY_END -->
 
 # Transparent segmentation for Jetson Nano
 
 RGB semantic segmentation of background, transparent things and transparent stuff. The deployment student is MobileNetV3-Large with a lightweight multiscale decoder. Training experiments add boundary supervision and SegFormer-B2 probability distillation independently. Known techniques are combined and evaluated for edge deployment; this is not a claim of a novel architecture.
 
-**Current measured status is maintained in [docs/PROGRESS.md](docs/PROGRESS.md).** Synthetic smoke results are not public-dataset accuracy. Nano code and host tests do not constitute physical Nano validation. Formal metrics remain pending until actual run receipts exist.
+**Current measured status is maintained in [docs/PROGRESS.md](docs/PROGRESS.md).** Synthetic smoke results are not public-dataset accuracy. Nano code and host tests do not constitute physical Nano validation. The completed formal results are in results/final; physical Nano metrics remain pending.
 
 ## Fast CPU verification
 

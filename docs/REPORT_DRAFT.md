@@ -82,7 +82,7 @@ S2 versus S0: clean-test mIoU change -0.0044 percentage points; boundary-F1 chan
 S3 versus S0: clean-test mIoU change +0.2105 percentage points; boundary-F1 change +0.2756 percentage points.
 
 Negative changes are retained. This single-seed comparison does not establish statistical significance.
-Figures in results/final are generated from actual logs. The four image columns are original / ground truth / S0 / selected student.
+Figures in results/final are generated from actual logs. The four image columns are original / ground truth / S0 / selected student. Green denotes transparent things, orange denotes transparent stuff, and background is uncolored.
 JPEG figure copies are display-sized previews; all metrics use original-resolution labels.
 Nano latency, power, temperatures and live camera quality remain pending physical hardware.
 

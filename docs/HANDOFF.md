@@ -1,58 +1,39 @@
-<!-- ACTUAL_DELIVERY_BEGIN -->
-## 主机实验与模型交付已完成
-
-T、S0、S1、S2、S3 均完成 20 轮；全部模型完成 4428 张原图上的四种条件测试。最终学生按验证集选择为 S1，正式模型和同一输入的 S0/最终模型演示已打包。
-
-模型包：[cw2_models_bf16_v1.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-a5fe408ef7f4e9df4648)。需要有仓库推送权限的 GitHub 账号登录；保持 Release 为草稿，不点击 Publish。
-
-体积：228205341 字节。SHA256：`630a471809b1befc786e8bab8354a5fa9da9f0871a726789e81e4bec2b6cb86d`。包内源码版本：`ee76dcda308a581c25804a5b7ddceb1e7e7de6aa`。
-
-模型包含五个最佳 checkpoint、最终学生 256/384/512 ONNX、S0 384 ONNX、对齐参考、实验记录、数据清单和验证静态图回放。已实际验证 GitHub 上传摘要、匿名访问拒绝和远端检出的 CPU 回归。
-
-仍需组员：按 JETSON.md 在原版 Nano 构建引擎、对齐和十分钟性能矩阵；按 DEMO_SCRIPT.md 做实拍。本机回放不代表 Nano 实测。
-<!-- ACTUAL_DELIVERY_END -->
-
 # 组员交接与唯一待办
 
-本文件随实际运行状态更新。先看 docs/PROGRESS.md，不要把下面“代码已实现”理解为“真实实验全部完成”。
+本机 L3 工作已完成：训练、完整测试、ONNX、演示回放、报告、模型包和 GitHub 交付均有实际证据。原版 Nano 实测和现场录制尚未进行，交由两位组员接手。
 
-## 当前交接状态
+## 取得工程与模型
 
-工程代码：数据审计、MobileNetV3 学生、SegFormer 教师、边界监督、蒸馏、训练/恢复、原图评价、ONNX、OpenCV 演示和 Nano 工具已经实现。主机及干净 CPU 环境的实际测试见 docs/VALIDATION.md。
+源码与报告：[工作分支](https://github.com/hogomex393-svg/Computer-Vision-cw2/tree/codex/transparent-segmentation)。模型包使用的源码版本为 `34530d7915c3691b606653d6158a23111fe45248`；分支上的后续提交只补充交接说明和最终复核记录。
 
-真实数据：官方 train/validation/test 全部下载、CRC 校验并解压，逐张审计完成。18 个训练标签方向异常已显式修正；11 组源数据跨集合重复保留在原始失败报告中。实际实验使用独立验收通过的 leak-free-v1 清单 4990/999/4428，全部测试图保留。
+模型包：[cw2_models_bf16_v2.zip](https://github.com/hogomex393-svg/Computer-Vision-cw2/releases/tag/untagged-249e98c24b10a87ef648)，228205346 字节，约 228 MB。需使用有本仓库推送权限的 GitHub 账号登录。保持草稿状态，不点击 Publish。v1 保留作历史记录，交付使用 v2；v2 修正了回放命令路径，模型、测试和视频内容未变。
 
-正式训练：活动系列为 runs/final_bf16。T 原样复用已完成的 20 轮教师，验证 mIoU 为 0.9239955207704398；四个学生及校准使用统一 BF16 协议重新训练，最新阶段见 PROGRESS 顶部。原 runs/final/S0 的 0.8775038527093654 为历史 FP16 结果，不能与新协议学生混合比较。前向溢出根因及修复证据见 NUMERICAL_FIX.md。runs/formal/T 是性能 pilot，runs/smoke 是合成功能验证。
+SHA256：`b0f1b57f60c25cc8c54d8284ee97b0b8073b8b58730318cb6392106428eb4246`。已从 GitHub 完整下载并核对这个摘要，匿名访问被拒绝。下载到本机后可用 PowerShell `Get-FileHash cw2_models_bf16_v2.zip -Algorithm SHA256` 再核对。
 
-模型导出：真实 S0 的 runs/final/exports/S0_384.onnx 已通过 PyTorch/ONNX Runtime 对齐，最大绝对误差小于 4.08e-5、三组掩膜一致率 1.0。验证图片和九秒静态图回放已跑通；最终学生和完整模型包仍待正式实验结束。
+将包解压到单独目录，在包根目录运行 `nano.py`。包中有五个最佳推理 checkpoint、S1 的 256/384/512 ONNX、S0 的 384 ONNX、数值对齐参考、完整实验记录和数据清单，以及 `demo/input_replay.mp4`、`demo/S0.mp4`、`demo/final.mp4`。完整优化器和随机状态的续跑 checkpoint 保留在训练电脑的 `runs/final_bf16/*/last.pt`。
 
-Nano：环境检查、引擎构建、FP32/FP16 runner、对齐检查、视频/摄像头、计时/资源采集和十分钟矩阵脚本已实现；没有真实板卡连接，硬件验证 pending。
+## 已完成的真实结果
 
-GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作分支 codex/transparent-segmentation。DzAsy11 已完成官方登录；工作分支已上传，远端提交 7b694c31cbf16f02f1d91d2bf475b80b44b524d0 已核对。后续正常提交继续更新。仓库公开，不自动把大模型、原始数据或原始录像放进提交。
+T、S0、S1、S2、S3 都完成 20 轮。每个模型都在全部 4428 张测试图上完成 clean、brightness、blur、jpeg 四种条件评价，恢复到原图尺寸计算。使用明确披露的 leak-free-v1 划分 4990/999/4428；原始数据与 18 个训练标签方向修正证据均保留。
 
-## 另外两位组员的最短接手路径
+部署选择在测试前按验证集锁定为 S1。干净测试 mIoU：T 92.3477%，S0 87.4782%，S1 87.5862%，S2 87.4738%，S3 87.6888%。S1 相对 S0 仅提高 0.1079 个百分点；S3 测试略高也不据此更换已锁定模型。单个 seed、收益小和失败案例都在报告中如实说明。
 
-1. 板端负责人：取得正式模型包后，先 `python3 nano.py env --out nano_results/environment`，提供实际 Nano/JetPack/TensorRT/Python 版本。按 docs/JETSON.md 构建引擎、验证 NPZ 对齐，跑本地视频，再跑矩阵。预期产物为 engine、alignment.json、benchmark.json、matrix.json、环境与 tegrastats 日志。这些是实机验收工作，核心 runner 已实现。
-2. 现场负责人：准备透明物件、三种背景、摄像头与无隐私回放素材，按 docs/DEMO_SCRIPT.md 录制。保留真实失败案例、同一视频的 S0/最终模型比较和现场 Nano 镜头。预期产物为原始录像、成片及素材来源记录。
+四个 ONNX 导出均通过 PyTorch/ONNX Runtime 数值检查，移除边界辅助头后主输出不变；全部参考掩膜一致率为 1.000，最大 logits 误差为 0.00003910。独立远端检出的 CPU 回归 29 项通过。
 
-## 尚需外部条件
+三段 MP4 都是同一组验证静态图组成的 90 帧、9 秒回放。它们验证了真实训练模型的读视频、分割和保存链路，不是摄像头实拍，也不是 Nano 性能。查看 `results/final/FINAL_REVIEW.json`、`results/final/results.json`、`docs/REPORT_DRAFT.md` 和 `docs/VALIDATION.md` 获取证据。
 
-目前缺少真实 Nano 及现场物件/摄像头；GitHub 认证已解决。GPU 已在本机可用，官方数据不需账号登录，普通代码问题由 Codex 继续修复。GitHub 推送与模型包分享的权限会在实际操作时核实；出现确实不可替代的条件才补到这里。
+## 组员唯一待办
 
-不要从聊天里发送密码。若使用私有组内存储交付模型，只需提供获得授权的存储位置或成员访问方式；公开 GitHub 仓库的已发布 Release 公开可见；本项目计划使用未发布的草稿 Release。GitHub 官方 API 文档说明，草稿仅向有推送权限的成员列出，上传工具还会先用无敏感内容的清单实际验证匿名访问被拒绝，再上传模型。
-
-## 模型包生成和组内交付
-
-正式流水线成功后使用：
+1. 板端负责人：在原版 Nano 4GB 上核对 JetPack 4.6.x、TensorRT 8.x、Python/PyCUDA/OpenCV。包根目录依次执行下面命令，先用附带回放，不依赖摄像头。然后按 JETSON.md 完成 256/384/512、FP32/FP16、同步/异步、十分钟稳定性和资源记录。预期产物为环境 JSON、引擎、对齐 JSON、matrix/benchmark JSON 和 tegrastats 日志。
+2. 现场负责人：准备透明物件、三种背景和无隐私摄像头素材。按 DEMO_SCRIPT.md 拍同一视频的 S0/S1 对照、真实 Nano 工作画面和真实失败案例，记录来源与场景。预期产物为原始录像、最终成片和素材说明。
 
 ```bash
-python package_artifacts.py --runs runs/final_bf16 --manifests data/clean_manifests --demo-dir artifacts/delivery_bf16/demo --out artifacts/cw2_models_v1
-python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --check-only
-python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --account DzAsy11 --tag cw2-host-v1
+python3 nano.py env --out nano_results/environment
+python3 nano.py build --onnx models/S1_384.onnx --engine models/S1_384_fp32.engine --precision fp32
+python3 nano.py build --onnx models/S1_384.onnx --engine models/S1_384_fp16.engine --precision fp16
+python3 nano.py verify --engine models/S1_384_fp16.engine --reference models/S1_384.reference.npz --out nano_results/alignment
+python3 nano.py demo --engine models/S1_384_fp16.engine --source demo/input_replay.mp4 --out nano_results/playback
+python3 nano.py matrix --models-dir models --model-prefix S1 --source demo/input_replay.mp4 --out nano_results/matrix --duration 600
 ```
 
-最后一条仅创建草稿，不发布公开 Release。它使用系统 Git 已登录账号，不写入或输出凭据；固定操作本任务仓库，核对账号与推送权限。先验证草稿和清单不能匿名访问，再上传模型并核对 GitHub 服务端 SHA256。真正成功的链接与回执要等实际执行后填写，不能把工具写好当成上传完成。
-
-组员应使用有本仓库推送权限的 GitHub 账号登录草稿页下载。不要点击 Publish：发布会改变可见范围。模型包包含最佳推理 checkpoint、ONNX/数值对齐参考、实验日志和清单；完整优化器/RNG 续跑状态仍在本机各实验 last.pt。
-
-来源：[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases)。
+这些命令的包内输入路径已核对。TensorRT 引擎仍必须在目标板生成并验收；主机没有伪造板端数据。FP16 若出现非有限值或对齐失败，保留错误并使用独立构建的 FP32 引擎继续诊断。

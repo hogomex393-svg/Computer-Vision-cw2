@@ -1,0 +1,62 @@
+{
+  "reviewed_at": "2026-11-05T16:22:56+08:00",
+  "scope": "Completed host L3 handoff; no physical Nano acceptance",
+  "review_method": "Assistant visual inspection and independent integrity checks",
+  "artifact": "cw2_models_bf16_v2.zip",
+  "artifact_source_commit": "34530d7915c3691b606653d6158a23111fe45248",
+  "bytes": 228205346,
+  "sha256": "b0f1b57f60c25cc8c54d8284ee97b0b8073b8b58730318cb6392106428eb4246",
+  "archive_members": 68,
+  "selected": "S1",
+  "selection_rule": "validation only, locked before testing",
+  "completed_models": 5,
+  "epochs_per_model": 20,
+  "completed_test_conditions": 20,
+  "images_per_test_condition": 4428,
+  "tests_in_clean_remote_checkout": 29,
+  "remote_checkout_test_seconds": 15.69,
+  "exports": 4,
+  "maximum_onnx_logit_error": 3.910064697265625e-05,
+  "minimum_mask_agreement": 1.0,
+  "authenticated_full_download_sha256": "b0f1b57f60c25cc8c54d8284ee97b0b8073b8b58730318cb6392106428eb4246",
+  "anonymous_access_denied": true,
+  "release_is_draft": true,
+  "decoded_videos": {
+    "input_replay": {
+      "decoded_frames": 90,
+      "fps": 10.0,
+      "duration_seconds": 9.0,
+      "width": 360,
+      "height": 480
+    },
+    "S0": {
+      "decoded_frames": 90,
+      "fps": 10.0,
+      "duration_seconds": 9.0,
+      "width": 720,
+      "height": 512
+    },
+    "final": {
+      "decoded_frames": 90,
+      "fps": 10.0,
+      "duration_seconds": 9.0,
+      "width": 720,
+      "height": 512
+    }
+  },
+  "visually_reviewed_fixed_cases": 6,
+  "visually_reviewed_global_failure_cases": 6,
+  "plots_reviewed": [
+    "metrics.png",
+    "learning_curves.png"
+  ],
+  "video_review": "All 270 frames decoded; each of the three source scenes visually checked in both output clips; readable replay/model/timing labels",
+  "observed_limitations": [
+    "Small single-seed test gains",
+    "Low strict original-grid boundary F1",
+    "Things/stuff confusion, missed glass planes and false foreground in worst cases",
+    "Validation still-image replay is not live footage or Nano performance"
+  ],
+  "nano_hardware_verified": false,
+  "v2_change": "Correct bundled replay path; all model, metric and video payloads unchanged from v1"
+}
