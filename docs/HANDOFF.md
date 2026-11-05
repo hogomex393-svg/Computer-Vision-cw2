@@ -8,7 +8,7 @@
 
 真实数据：官方 train/validation/test 全部下载、CRC 校验并解压，逐张审计完成。18 个训练标签方向异常已显式修正；11 组源数据跨集合重复保留在原始失败报告中。实际实验使用独立验收通过的 leak-free-v1 清单 4990/999/4428，全部测试图保留。
 
-正式训练：runs/final 中 T、S0 各完成 20 轮，最佳验证 mIoU 分别为 0.9239955207704398、0.8775038527093654。checkpoint 和 epochs.jsonl 在各自目录，小型回执在 results。两项边界校准各完成 3 轮；蒸馏校准因非有限损失曾停止，失败记录已保留，2026-11-05 08:05 按原配置重新运行并捕获异常现场。S1、S2、S3 及全部最终测试尚未完成，最新阶段以 PROGRESS 顶部为准。runs/formal/T 是性能 pilot，runs/smoke 是合成功能验证。
+正式训练：活动系列为 runs/final_bf16。T 原样复用已完成的 20 轮教师，验证 mIoU 为 0.9239955207704398；四个学生及校准使用统一 BF16 协议重新训练，最新阶段见 PROGRESS 顶部。原 runs/final/S0 的 0.8775038527093654 为历史 FP16 结果，不能与新协议学生混合比较。前向溢出根因及修复证据见 NUMERICAL_FIX.md。runs/formal/T 是性能 pilot，runs/smoke 是合成功能验证。
 
 模型导出：真实 S0 的 runs/final/exports/S0_384.onnx 已通过 PyTorch/ONNX Runtime 对齐，最大绝对误差小于 4.08e-5、三组掩膜一致率 1.0。验证图片和九秒静态图回放已跑通；最终学生和完整模型包仍待正式实验结束。
 
@@ -32,7 +32,7 @@ GitHub：目标 https://github.com/hogomex393-svg/Computer-Vision-cw2 ，工作�
 正式流水线成功后使用：
 
 ```bash
-python package_artifacts.py --runs runs/final --manifests data/clean_manifests --out artifacts/cw2_models_v1
+python package_artifacts.py --runs runs/final_bf16 --manifests data/clean_manifests --demo-dir artifacts/delivery_bf16/demo --out artifacts/cw2_models_v1
 python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --check-only
 python publish_artifacts.py --archive artifacts/cw2_models_v1.zip --account DzAsy11 --tag cw2-host-v1
 ```

@@ -41,6 +41,7 @@ def validate_bundle(archive):
         result_files = ('run.json', 'epochs.jsonl', 'best_validation.json', 'test_clean.json',
                         'test_brightness.json', 'test_blur.json', 'test_jpeg.json')
         expected = {'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'}
+        expected.update('demo/' + name for name in ('input_replay.mp4', 'S0.mp4', 'final.mp4', 'S0_timings.json', 'final_timings.json', 'provenance.json'))
         expected.update('manifests/' + name for name in ('train.json', 'validation.json', 'test.json', 'audit.json'))
         expected.update('checkpoints/' + name + '.pt' for name in experiments)
         expected.update('results/' + name + '/' + filename for name in experiments for filename in result_files)
@@ -57,7 +58,7 @@ def validate_bundle(archive):
             path = PurePosixPath(entry['path'])
             if path.is_absolute() or '..' in path.parts or ':' in str(path):
                 raise ValueError('Unsafe archive path')
-            if path.parts[0] not in ('checkpoints', 'models', 'results', 'manifests', 'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'):
+            if path.parts[0] not in ('checkpoints', 'models', 'results', 'manifests', 'demo', 'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'):
                 raise ValueError('Archive contains material outside the project handoff')
             digest = hashlib.sha256()
             with z.open(entry['path']) as source:

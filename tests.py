@@ -408,6 +408,7 @@ def test_release_bundle_includes_manifests_and_rejects_tampering(tmp_path):
     import zipfile
     from publish_artifacts import validate_bundle
     names = {'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'}
+    names.update('demo/' + name for name in ('input_replay.mp4', 'S0.mp4', 'final.mp4', 'S0_timings.json', 'final_timings.json', 'provenance.json'))
     names.update('manifests/' + name for name in ('train.json', 'validation.json', 'test.json', 'audit.json'))
     result_files = ('run.json', 'epochs.jsonl', 'best_validation.json', 'test_clean.json',
                     'test_brightness.json', 'test_blur.json', 'test_jpeg.json')
@@ -489,3 +490,19 @@ def test_teacher_reuse_preserves_identity_and_refuses_changed_data(tmp_path):
     with pytest.raises(ValueError, match='data manifests differ'):
         reuse_teacher(source, target, manifests, config)
     assert json.loads((target / 'run.json').read_text()) == run
+
+
+def test_delivery_refuses_partial_pipeline_and_replaces_only_its_section(tmp_path):
+    from delivery import verify_results, replace_section
+    runs = tmp_path / 'runs'
+    runs.mkdir()
+    (runs / 'pipeline.json').write_text(json.dumps({'status': 'failed', 'experiments': ['T']}))
+    with pytest.raises(ValueError, match='All five complete'):
+        verify_results(runs, tmp_path / 'manifests')
+    note = tmp_path / 'notes.md'
+    note.write_text('Manual evidence\n', encoding='utf-8')
+    replace_section(note, 'first')
+    replace_section(note, 'second')
+    text = note.read_text(encoding='utf-8')
+    assert text.count('ACTUAL_DELIVERY_BEGIN') == 1
+    assert 'Manual evidence' in text and 'second' in text and 'first' not in text

@@ -11,7 +11,7 @@ from data import sha256
 from learning import load_checkpoint, write_json
 
 
-def package(runs, output, manifests=None):
+def package(runs, output, manifests=None, demo_dir=None):
     runs, output = Path(runs), Path(output)
     pipeline_state = runs / 'pipeline.json'
     if not pipeline_state.exists() or json.loads(pipeline_state.read_text())['status'] != 'completed':
@@ -20,6 +20,8 @@ def package(runs, output, manifests=None):
         raise ValueError('All five experiments must be represented in the completed pipeline')
     if manifests is None:
         raise ValueError('Pass the audited experiment manifests')
+    if demo_dir is None:
+        raise ValueError('Pass the verified validation replay directory')
     manifests = Path(manifests)
     manifest_hashes = {split: sha256(manifests / (split + '.json')) for split in ('train', 'validation', 'test')}
     dirty = subprocess.run(['git', 'diff', '--quiet', 'HEAD', '--', '*.py', 'configs', 'requirements*.txt'])
@@ -33,6 +35,16 @@ def package(runs, output, manifests=None):
     selected = selection['selected']
     if selected not in ('S0', 'S1', 'S2', 'S3'):
         raise ValueError('Deployment selection must be a student')
+    demo_dir = Path(demo_dir)
+    demo_record = json.loads((demo_dir / 'provenance.json').read_text())
+    if demo_record['selected'] != selected or demo_record['source_type'] != 'validation_still_image_replay':
+        raise ValueError('Demo provenance differs from the selected model')
+    (output / 'demo').mkdir()
+    for name in ('input_replay.mp4', 'S0.mp4', 'final.mp4', 'S0_timings.json', 'final_timings.json'):
+        if sha256(demo_dir / name) != demo_record['files'][name]:
+            raise ValueError('Demo file differs: ' + name)
+        shutil.copy2(demo_dir / name, output / 'demo' / name)
+    shutil.copy2(demo_dir / 'provenance.json', output / 'demo/provenance.json')
     for name in ('T', 'S0', 'S1', 'S2', 'S3'):
         run = json.loads((runs / name / 'run.json').read_text())
         if run['status'] != 'completed' or run['smoke']:
@@ -76,6 +88,7 @@ def package(runs, output, manifests=None):
         'No TensorRT engine is included: build on the target Nano. Nano hardware acceptance is separate.\n'
         'Classes: 0=background, 1=transparent things, 2=transparent stuff. Dataset ignore=255 is not a model output class.\n'
         'The S0 384 baseline export is included for sequential comparison on the same video.\n'
+        'demo/ contains a validation still-image replay and both model outputs. It is not live footage or a Nano speed test.\n'
         'Use the matching source Git revision and docs/JETSON.md. Public-data accuracy is in results; all measurements retain provenance.\n\n'
         '```bash\npython3 nano.py env --out nano_results/environment\n'
         'python3 nano.py build --onnx models/' + selected + '_384.onnx --engine models/' + selected + '_384_fp16.engine --precision fp16\n'
@@ -107,5 +120,6 @@ if __name__ == '__main__':
     parser.add_argument('--runs', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--manifests', required=True)
+    parser.add_argument('--demo-dir', required=True)
     args = parser.parse_args()
-    print(json.dumps(package(args.runs, args.out, args.manifests), indent=2))
+    print(json.dumps(package(args.runs, args.out, args.manifests, args.demo_dir), indent=2))

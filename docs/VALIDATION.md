@@ -73,3 +73,9 @@ The complete T and S0 runs each contain 20 epochs. T best validation mIoU is 0.9
 The first KD calibration failed on nonfinite loss before completing its first epoch. Its run record is preserved under runs/failed_kd_20261105_003541. An independent 1248-batch replay did not reproduce the failure; root cause is still undetermined. The same-code production retry uses local.retry_pipeline.py solely to collect tensor diagnostics after an exception. No training result is accepted by suppressing nonfinite checks.
 
 Fixed the release validator's omission of the required manifests directory from its allowed paths. In the independent CPU environment, `python -m pytest tests.py -q -k "release_bundle or nano_report" --basetemp artifacts/pytest_delivery_20261105 --junitxml artifacts/pytest_delivery_20261105.xml` returned 0: two checks passed in 6.93 seconds. The bundle fixture includes all expected paths and refuses modified manifest bytes and unrelated archive entries. Nano result ingestion refuses unverified hardware. No draft release or model upload has yet been claimed.
+
+## BF16 correction and complete delivery checks
+
+The captured production batch reproduces FP16 overflow at encoder.16.0 (FP32 magnitude 67143.6796875). BF16 replay has finite output, loss and every student gradient; the teacher remains gradient-free. CPU full regression: 27 passed in 13.15 s, artifacts/pytest_bf16_cpu.xml. Delivery guards and archive checks: 3 passed in 6.95 s, artifacts/pytest_final_delivery.xml.
+
+The new replay generator was exercised using the existing trained FP16 S0 as both comparison slots. All 90 source frames passed through both paths, H.264 outputs and provenance digests were produced in artifacts/delivery_replay_check. This verifies the baseline-selected edge case and real video processing, not completion of the new BF16 experiment series.

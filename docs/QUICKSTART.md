@@ -94,3 +94,11 @@ These lossless 2-bit caches preserve labels 0/1/2/255 at original resolution. Th
 The pipeline updates docs/PROGRESS.md and RUN_ROOT/CURRENT_STAGE.json at training/validation boundaries and each evaluation/export phase. run.json contains the actual process PID and completed epochs. Check the process command and logs before resuming; do not start a second writer. Historical runs/formal/T is the one-epoch performance pilot, not the final 20-epoch series.
 
 Pipeline recovery reuses evaluations only when run identity, checkpoint digest, manifest digest, corruption and complete sample count match. Exports require matching model/reference digests and fixed shape. Figure rendering selects fixed examples and global failures from the completed clean-test per-image results, and re-infers only that figure subset; full benchmark evaluation remains unchanged.
+
+## Training precision and completion
+
+Student configurations now use BF16 AMP on supported CUDA devices after a reproduced FP16 forward overflow; see NUMERICAL_FIX.md. All four students and calibration candidates must use the same setting. The teacher may retain its original verified training protocol. To reuse an independently completed teacher in a new run, pass `--teacher-run PREVIOUS_RUN/T`; the files, config, source identities and manifest/checkpoint provenance are verified and preserved. Do not reuse the older FP16 S0 as the BF16 baseline.
+
+`delivery.py` checks all five completed experiments, exact full-test coverage, validation-only selection and exports, renders the documented validation still-image replay, and prepares result figures and report text. `--upload` additionally performs normal commits to the designated branch/repository, a clean remote CPU check, archive validation and collaborator-only draft release upload. It never publishes a public release. `--wait` waits for the specified pipeline to complete and fails if that pipeline fails. Required arguments include `--runs`, `--manifests`, `--video`, `--video-sources`, `--out`; optional tools are `--ffmpeg` and `--cpu-python`. The provided replay must be labeled as a validation still-image sequence, not live footage.
+
+Standalone packaging now also requires `--demo-dir DELIVERY/demo`, produced by the completion tool. No CUDA training stack is required on Nano.
