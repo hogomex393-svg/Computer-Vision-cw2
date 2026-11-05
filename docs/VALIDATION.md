@@ -4,7 +4,7 @@ The final host checks are summarized below; subsequent sections preserve the chr
 
 ## Final host verification (2026-11-05T16:22:56+08:00)
 
-All five 20-epoch runs, all 20 full-test conditions and four formal exports passed provenance checks. Every test condition contains exactly 4428 source paths. The 29-test clean CPU suite passed from the final artifact source commit 34530d7915c3691b606653d6158a23111fe45248 in 15.69 seconds; receipt artifacts/delivery_bf16/remote_check_ee76dcda308a/artifacts/final_v2_pytest.xml records that actual checkout identity.
+All five 20-epoch runs, all 20 full-test conditions and four formal exports passed provenance checks. Every test condition contains exactly 4428 source paths. The 29-test clean CPU suite passed from the final artifact source commit 34530d7915c3691b606653d6158a23111fe45248 in 15.69 seconds; receipt results/final/validation_pytest.xml was retained after the temporary remote checkout was cleaned; it records that verified run.
 
 All 90 frames of each of the three H.264 replay clips decoded. The assistant visually inspected all three scenes in both model outputs, six fixed test cases, six global failures and both result plots. Limitations are described in REPORT_DRAFT.md. This is assistant content review, not physical Nano or human scene acceptance.
 
@@ -91,3 +91,10 @@ The captured production batch reproduces FP16 overflow at encoder.16.0 (FP32 mag
 The new replay generator was exercised using the existing trained FP16 S0 as both comparison slots. All 90 source frames passed through both paths, H.264 outputs and provenance digests were produced in artifacts/delivery_replay_check. This verifies the baseline-selected edge case and real video processing, not completion of the new BF16 experiment series.
 
 Independent remote checkout at 0966f81e57b8e06e9ffc71f5093a9dea932aa9c6 passed all 28 tests in 25.71 s using the separately installed CPU environment. Receipt: ../tmp/cw2-0966f81-check/artifacts/remote_bf16_pytest.xml. Subsequent Nano output guarding was checked without hardware: nonfinite engine output is refused before argmax, and Python 3.6 syntax remains valid. Real TensorRT execution is still pending.
+
+
+## Authorized post-delivery storage cleanup
+
+The approved 31 targets were removed after absolute-path, ancestor/reparse-point, process and unchanged-inventory checks. Fourteen XML receipts were copied with SHA256 verification before removing disposable checkouts. The original data trees, formal run tree, tracked source-support trees and pretrained weights matched their pre-cleanup file-count/size/mtime fingerprints immediately after cleanup. The retained v2 ZIP still has SHA256 b0f1b57f60c25cc8c54d8284ee97b0b8073b8b58730318cb6392106428eb4246. All ten formal best/last checkpoints remain. A real replay frame passed S1 ONNX inference and original-grid restoration in the retained CPU environment. See artifacts/cleanup_receipt.json and artifacts/post_cleanup_verification.json. No full training or repeated test benchmark was needed for this storage-only operation.
+
+The public results/final/validation_pytest.xml omits only the local hostname attribute; test cases, outcomes and timing are unchanged. The byte-identical original XML remains in artifacts/retained_verification.

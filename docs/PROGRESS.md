@@ -21,3 +21,14 @@
 GPU Python：`F:/PyLibs/cv_cw2_lib/Scripts/python.exe`；独立 CPU Python：`F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe`。原始数据：`F:/Datasets/computer_vision/Trans10K`，实际清单：`data/clean_manifests`。权重缓存由 TORCH_HOME/HF_HOME 指向 `F:/Models/computer_vision/cw2`。
 
 需要重做新实验时使用新 run 目录，保持配置和来源可追溯。不要因旧 PID 或历史日志重新启动已经完成的流水线。15:07 曾为缓解前台卡顿将测试进程降为 BelowNormal；该进程已结束，没有改动其他服务或系统全局优先级。
+
+
+## 交付后的本机清理（2026-11-05T17:25:02.0305751+08:00）
+
+用户明确批准此前列出的约 37.5 GiB 清理方案。已删除三处可重建数据缓存、三份已解压的下载 ZIP、旧 FP16/pilot/smoke 模型快照、临时测试数据、重复打包目录及旧验证检出。文件总量 37.4507 GiB；D/F 盘可用空间合计增加约 37.44 GiB，其他后台写入会使磁盘差值略有波动。
+
+保留并核对：代码/Git、报告与图表、v2 模型 ZIP、runs/final_bf16 全部正式 best/last checkpoint、原始 train/validation/test 图片和标签、两个运行环境及预训练权重。最新 ZIP 的 SHA256 未变；清理后使用保留环境和 S1 ONNX 对保留回放的一帧推理通过。
+
+14 份验证 XML 已复制并校验至 artifacts/retained_verification，最终 29 项检查的 XML 另保存在 results/final/validation_pytest.xml。清理清单和逐项回执：artifacts/cleanup_plan.json、artifacts/cleanup_receipt.json、artifacts/post_cleanup_verification.json。
+
+后续若重跑训练或完整测试，须按 QUICKSTART.md 从保留的原图重新生成三处缓存及可选的原图标签缓存；本机演示不需要这些缓存。历史 --teacher-run runs/final/T 已不再有模型文件，今后需复用教师时使用 runs/final_bf16/T，并为新实验指定新输出目录。旧实验的小型 JSON/日志仍保留；FP16 失败现场的独立副本 artifacts/kd_production_failure_batch.pt 仍保留。GitHub 模型包和正式实验结果不受此次本机清理影响。

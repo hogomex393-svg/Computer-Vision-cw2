@@ -13,3 +13,5 @@ The completed 20-epoch teacher is reused as an independently trained teacher. Th
 BF16 is a host training choice. Export still uses FP32 weights and logits. Nano deployment remains TensorRT FP32/FP16, with mandatory target numerical validation; BF16 is not required on the Nano. Actual board performance is still unverified.
 
 Source: [PyTorch 2.6 AMP documentation](https://docs.pytorch.org/docs/2.6/amp.html) and [gradient scaling examples](https://docs.pytorch.org/docs/2.6/notes/amp_examples.html). Hardware range failure and the successful counterexample replay were measured locally.
+
+Storage note after user-approved cleanup: old FP16 checkpoint files were removed, while their JSON/log records remain under runs/final. The captured failure tensor still exists as artifacts/kd_production_failure_batch.pt. All completed BF16 checkpoints and formal results remain intact.
