@@ -1,0 +1,45 @@
+{
+  "miou": 0.8775038527093654,
+  "per_class_iou": [
+    0.9373043355761416,
+    0.8691825598306083,
+    0.8260246627213464
+  ],
+  "foreground_iou": 0.8443458650462444,
+  "foreground_dice": 0.9156046932933304,
+  "boundary_f1": 0.13620082359975463,
+  "boundary_tolerance_pixels": 2,
+  "confusion": [
+    [
+      7810223408,
+      60306772,
+      236946258
+    ],
+    [
+      47387008,
+      795554432,
+      5349316
+    ],
+    [
+      177780618,
+      6692848,
+      2026274286
+    ]
+  ],
+  "valid_pixels": 11166514946,
+  "absent_class_policy": "exclude only classes with zero union",
+  "boundary_policy": "micro over foreground classes; Chebyshev tolerance at original resolution; empty/empty=null",
+  "samples": 999,
+  "corruption": "clean",
+  "seed": 42,
+  "dataset_source": "Trans10K v1",
+  "split": "validation",
+  "manifest_sha256": "de10378815f66456a1cc90ac39f32f134d2974749b85390cf731dbe518c8038f",
+  "data_protocol": "leak-free-v1",
+  "effective_split_counts": {
+    "train": 4990,
+    "validation": 999,
+    "test": 4428
+  },
+  "gpu_metric_samples": 999
+}

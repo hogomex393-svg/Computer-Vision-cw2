@@ -55,7 +55,7 @@ def validate_bundle(archive):
             path = PurePosixPath(entry['path'])
             if path.is_absolute() or '..' in path.parts or ':' in str(path):
                 raise ValueError('Unsafe archive path')
-            if path.parts[0] not in ('checkpoints', 'models', 'results', 'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'):
+            if path.parts[0] not in ('checkpoints', 'models', 'results', 'manifests', 'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'):
                 raise ValueError('Archive contains material outside the project handoff')
             digest = hashlib.sha256()
             with z.open(entry['path']) as source:

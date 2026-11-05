@@ -68,6 +68,72 @@ def summarize(root, output):
         fig.tight_layout()
         fig.savefig(output / 'metrics.png', dpi=180)
         plt.close(fig)
+    histories = {}
+    for name in ('T', 'S0', 'S1', 'S2', 'S3'):
+        path = root / name / 'epochs.jsonl'
+        if path.exists():
+            histories[name] = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    if histories:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+        for name, history in histories.items():
+            axes[0].plot([r['epoch'] for r in history], [r['loss'] for r in history], label=name)
+            axes[1].plot([r['epoch'] for r in history], [r['validation_miou'] for r in history], label=name)
+        axes[0].set(xlabel='Completed epoch', ylabel='Configured total loss', title='Loss terms differ across experiments')
+        axes[1].set(xlabel='Completed epoch', ylabel='Validation mIoU', ylim=(0, 1), title='Actual logged validation curves')
+        for axis in axes:
+            axis.legend()
+            axis.grid(alpha=0.2)
+        fig.tight_layout()
+        fig.savefig(output / 'learning_curves.png', dpi=180)
+        plt.close(fig)
+    return rows
+
+
+def summarize_nano(paths, output):
+    output = Path(output)
+    rows = []
+    for path in paths:
+        matrix = json.loads(Path(path).read_text(encoding='utf-8'))
+        for name, record in matrix.items():
+            if (record.get('environment', {}).get('target_matches') is not True or record.get('smoke') is not False or
+                    record.get('engine', {}).get('smoke') is not False or record.get('sustained_duration_met') is not True or
+                    record.get('requested_duration_seconds', 0) < 600):
+                raise ValueError('Only actual original-Nano non-smoke sustained measurements can enter the Nano report')
+            rows.append({'case': name, 'matrix': Path(path).name, 'source_type': record['source_type'],
+                         'precision': record['engine']['precision'], 'input_size': record['input_size'],
+                         'inference': record['inference'], 'end_to_end': record['end_to_end'],
+                         'processed_fps_wall': record['processed_fps_wall'], 'frame_age': record['frame_age'],
+                         'dropped': record['dropped'], 'resources': record['resources'],
+                         'environment': record['environment']})
+    if not rows:
+        raise ValueError('No Nano measurements supplied')
+    output.mkdir(parents=True, exist_ok=True)
+    (output / 'nano_results.json').write_text(json.dumps(rows, indent=2), encoding='utf-8')
+    lines = ['# Real Nano measurements', '', 'Generated only from original-Nano sustained benchmark receipts.', '']
+    for row in rows:
+        lines.extend(['## ' + row['case'], '',
+                      'Source: {}. Precision: {}. Input: {}.'.format(row['source_type'], row['precision'], row['input_size']),
+                      'Processing FPS: {}. End-to-end mean/P50/P95 ms: {}/{}/{}.'.format(
+                          row['processed_fps_wall'], row['end_to_end']['mean_ms'], row['end_to_end']['p50_ms'], row['end_to_end']['p95_ms']),
+                      'Dropped frames: {}. Resources: {}.'.format(row['dropped'], json.dumps(row['resources'])), ''])
+    (output / 'NANO_RESULTS.md').write_text('\n'.join(lines), encoding='utf-8')
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 2, figsize=(max(10, len(rows) * 0.9), 4))
+    labels = [r['case'] for r in rows]
+    axes[0].bar(labels, [r['processed_fps_wall'] for r in rows])
+    axes[0].set(ylabel='Processed frames / wall second', title='Real sustained processing throughput')
+    axes[1].bar(labels, [r['end_to_end']['p95_ms'] for r in rows])
+    axes[1].set(ylabel='P95 end-to-end latency (ms)', title='Capture through saved overlay')
+    for axis in axes:
+        axis.tick_params(axis='x', labelrotation=45)
+    fig.tight_layout()
+    fig.savefig(output / 'nano_performance.png', dpi=180)
+    plt.close(fig)
     return rows
 
 
@@ -75,5 +141,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--runs', required=True)
     parser.add_argument('--out', default='results')
+    parser.add_argument('--nano', nargs='*')
     args = parser.parse_args()
     summarize(args.runs, args.out)
+    if args.nano:
+        summarize_nano(args.nano, args.out)

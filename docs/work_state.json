@@ -179,6 +179,33 @@
       ],
       "next_action": "Complete caches and run teacher first full epoch",
       "created_at": "2026-11-04"
+    },
+    {
+      "revision": 4,
+      "item_id": "W03",
+      "state": "T completed 20 epochs; S0 training; host validation and delivery tools verified",
+      "evidence": [
+        "results/T_training.json",
+        "results/T_validation.json",
+        "runs/final/CURRENT_STAGE.json",
+        "artifacts/final_cpu_pytest.xml"
+      ],
+      "next_action": "Finish sequential training/calibration, then full test/export and authenticated draft handoff",
+      "created_at": "2026-11-05"
+    },
+    {
+      "revision": 5,
+      "item_id": "W03",
+      "state": "T and S0 completed; boundary calibration completed; KD retry running after preserved nonfinite failure",
+      "evidence": [
+        "results/S0_training.json",
+        "results/T_training.json",
+        "artifacts/kd_failure_diagnosis.json",
+        "artifacts/final_retry_launch.json",
+        "runs/failed_kd_20261105_003541/run.json"
+      ],
+      "next_action": "Observe same-code production retry with exception-only tensor capture; finish calibration and S1/S2/S3",
+      "created_at": "2026-11-05T08:05:28+08:00"
     }
   ],
   "gates": {
@@ -188,7 +215,7 @@
     "staging_implemented": "passed",
     "automated_tests": "passed",
     "disabled_release": "not_started",
-    "formal_configuration": "not_started",
+    "formal_configuration": "passed",
     "real_acceptance": "not_started"
   }
 }

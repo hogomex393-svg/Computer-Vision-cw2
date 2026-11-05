@@ -66,3 +66,10 @@ Training source hashes still match the recorded a2ec4a2 implementation. Subseque
 - Delivery orchestration rejects stale checkpoint/data/corruption receipts and incomplete per-image results; focused checks passed.
 - Figure selection uses fixed first entries plus globally lowest scores from the complete clean-test result; shuffled result-order regression passed.
 - Core training source hashes remain unchanged while the active pipeline runs.
+## 2026-11-05 delivery validation and KD recovery
+
+The complete T and S0 runs each contain 20 epochs. T best validation mIoU is 0.9239955207704398; S0 is 0.8775038527093654. These are validation measurements on leak-free-v1, not final test results.
+
+The first KD calibration failed on nonfinite loss before completing its first epoch. Its run record is preserved under runs/failed_kd_20261105_003541. An independent 1248-batch replay did not reproduce the failure; root cause is still undetermined. The same-code production retry uses local.retry_pipeline.py solely to collect tensor diagnostics after an exception. No training result is accepted by suppressing nonfinite checks.
+
+Fixed the release validator's omission of the required manifests directory from its allowed paths. In the independent CPU environment, `python -m pytest tests.py -q -k "release_bundle or nano_report" --basetemp artifacts/pytest_delivery_20261105 --junitxml artifacts/pytest_delivery_20261105.xml` returned 0: two checks passed in 6.93 seconds. The bundle fixture includes all expected paths and refuses modified manifest bytes and unrelated archive entries. Nano result ingestion refuses unverified hardware. No draft release or model upload has yet been claimed.

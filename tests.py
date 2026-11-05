@@ -392,3 +392,53 @@ def test_figures_use_full_test_scores_without_cherry_picking(tmp_path):
     indices = prepare_figure_manifest(manifest_path, evaluation_path, tmp_path / 'figures.json', 'model', limit=2)
     assert indices == [0, 1, 2, 4]
     assert json.loads((tmp_path / 'figures.json').read_text())['split'] == 'figures_only'
+
+
+def test_nano_report_refuses_unverified_hardware(tmp_path):
+    from report import summarize_nano
+    path = tmp_path / 'unverified.json'
+    path.write_text(json.dumps({'S3_384_fp16': {'environment': {'target_matches': False}}}))
+    with pytest.raises(ValueError, match='actual original-Nano'):
+        summarize_nano([path], tmp_path / 'report')
+    assert not (tmp_path / 'report/nano_results.json').exists()
+
+
+def test_release_bundle_includes_manifests_and_rejects_tampering(tmp_path):
+    import hashlib
+    import zipfile
+    from publish_artifacts import validate_bundle
+    names = {'nano.py', 'runtime.py', 'selection.json', 'ARTIFACTS.md'}
+    names.update('manifests/' + name for name in ('train.json', 'validation.json', 'test.json', 'audit.json'))
+    result_files = ('run.json', 'epochs.jsonl', 'best_validation.json', 'test_clean.json',
+                    'test_brightness.json', 'test_blur.json', 'test_jpeg.json')
+    for name in ('T', 'S0', 'S1', 'S2', 'S3'):
+        names.add('checkpoints/' + name + '.pt')
+        names.update('results/' + name + '/' + item for item in result_files)
+    for name, size in (('S3', 256), ('S3', 384), ('S3', 512), ('S0', 384)):
+        names.update('models/{}_{}{}'.format(name, size, suffix) for suffix in ('.onnx', '.json', '.reference.npz'))
+    payload = b'unit-test archive content; no model weights'
+    manifest = {'source_commit': 'a' * 40, 'selected': 'S3',
+                'files': [{'path': name, 'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
+                          for name in sorted(names)]}
+    archive = tmp_path / 'fixture.zip'
+
+    def make_archive(tampered=False, extra=False):
+        with zipfile.ZipFile(archive, 'w') as stream:
+            stream.writestr('manifest.json', json.dumps(manifest))
+            for name in sorted(names):
+                stream.writestr(name, b'changed' if tampered and name == 'manifests/train.json' else payload)
+            if extra:
+                stream.writestr('unrelated.txt', b'unrelated')
+        recipe = {'source_commit': 'a' * 40, 'selected': 'S3', 'archive': archive.name,
+                  'bytes': archive.stat().st_size, 'sha256': sha256(archive)}
+        archive.with_suffix('.release.json').write_text(json.dumps(recipe))
+        return recipe
+
+    recipe = make_archive()
+    assert validate_bundle(archive) == recipe
+    make_archive(tampered=True)
+    with pytest.raises(ValueError, match='checksum mismatch'):
+        validate_bundle(archive)
+    make_archive(extra=True)
+    with pytest.raises(ValueError, match='Unexpected archive entries'):
+        validate_bundle(archive)

@@ -1,13 +1,13 @@
 <!-- CV_CW2_AUTO_PROGRESS_BEGIN -->
 ## 自动运行进度
 
-更新时间：2026-11-05T00:04:27+08:00
-当前阶段：S0：验证第 16 轮
+更新时间：2026-11-05T08:07:58+08:00
+当前阶段：calibration_kd_T2_W025：验证第 1 轮
 运行目录：runs\final
 以下为最近检查点；恢复前仍需核对进程和日志。
 
 T：completed，完整轮次 20/20，最佳验证 mIoU 0.923996。
-S0：running，完整轮次 15/20，最佳验证 mIoU 0.874818。
+S0：completed，完整轮次 20/20，最佳验证 mIoU 0.877504。
 S1：pending，完整轮次 0/pending。
 S2：pending，完整轮次 0/pending。
 S3：pending，完整轮次 0/pending。
@@ -16,115 +16,51 @@ S3：pending，完整轮次 0/pending。
 <!-- CV_CW2_AUTO_PROGRESS_END -->
 
 
+# 项目进度与恢复入口
 
+## 已完成
 
+数据审计、模型与损失、训练恢复、原图评价、ONNX、OpenCV 演示和 Nano 工具均已实现。独立 CPU 环境的完整回归已有 23 项通过；2026-11-05 新增模型包完整性与 Nano 结果真实性检查通过，详见 VALIDATION.md。
 
+官方 Trans10K 三个压缩包全部下载、CRC 校验并解压。18 个训练掩膜方向异常按 SHA 绑定配方在加载时修正，原始数据不改。官方划分有 11 组跨集合重复；实际实验采用 leak-free-v1 清单 4990/999/4428，保留完整测试集。训练、验证、四种测试条件的缓存以及原图掩膜无损缓存均已完成。
 
+正式系列 runs/final 中，T 和 S0 都完成 20 个完整 epoch。最佳验证 mIoU：T=0.9239955207704398，S0=0.8775038527093654。边界校准两个候选均完成 3 轮，lambda=0.1/0.2 对应 0.8239747173978853/0.8259085263637763；最终参数须等蒸馏候选也完成再统一选择。
 
+真实 S0 的 384 ONNX 已导出并通过数值对齐，最大误差小于 4.08e-5，三组掩膜一致率均为 1.0。真实验证图片预览 artifacts/S0_validation_preview.png；九秒验证静态图回放 artifacts/S0_validation_replay.mp4。回放不代表实时摄像头或 Nano 性能。
 
+GitHub 工作分支已实际推送。当前已核对的远端版本 be6f3d0；训练核心源码身份为 a2ec4a2 对应的五个文件 SHA。后续正常提交不覆盖已有历史。
 
+## 当前恢复点
 
+2026-11-05 00:35:41，第一项蒸馏校准在第一个 epoch 出现 Nonfinite training loss，流程按设计失败退出。失败记录完整保留在 runs/failed_kd_20261105_003541，原日志 artifacts/final_pipeline.stdout.log 与 stderr.log。没有伪造完成轮次，也未删除已经完成的 T、S0 和边界校准。
 
+独立诊断重放全部 1248 个训练批次未复现，证据 artifacts/kd_failure_diagnosis.json；根因尚未确认。08:05 使用相同训练源码、配置、数据重新执行正式 pipeline。local.retry_pipeline.py 只在实际异常退出后读取失败栈并保存张量现场，不改变训练计算；启动回执 artifacts/final_retry_launch.json。运行状态以顶部自动记录、run.json、实际进程和日志为准。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 当前进度
-
-## 已完成并验证
-
-- 工程已实现数据审计、标签转换、学生/教师、独立边界与蒸馏、训练恢复、原图评价、ONNX、图像/视频演示和 Nano 工具。
-- 项目 CUDA 环境和从公开源新安装的独立 CPU 环境均通过关键回归；最新完整干净 CPU 回归 23 项通过，25.37 秒。日志 artifacts/final_cpu_pytest.xml。
-- 合成样本 GPU 训练完成 60 轮、180 次更新，损失 2.0881 降至 0.07437。它只证明链路有效，不代表透明物体准确率。
-- 合成样本学生 ONNX opset 11 与 PyTorch 对齐，最大绝对误差小于 3.82e-6，测试掩膜一致率 1.0。辅助头移除后主输出完全一致。
-- 官方 Trans10K 三个压缩包全部下载、CRC 校验、解压完成。测试集中断后通过 HTTP Range 续传，不是残缺数据。
-- NVIDIA SegFormer-B2 和 Torchvision MobileNetV3 官方预训练权重已取得。384 输入、batch 4 在 RTX 4060 8GB 上通过显存/速度探测。
-- 原任务书、需求契约和实现/交接文档均已保存。工作分支已上传并完成独立远端检出验证；最新已推送的主训练实现为 a2ec4a2。
-
-## 正在进行
-
-已逐张核对并修正 18 个训练掩膜方向异常，配方和 SHA256 在 configs/trans10k_v1_geometry.json，检查图位于 results/geometry_review_*.jpg。验证和测试集不做此类修正。完整审计已完成：几何与标签检查通过，但官方源有 11 组跨集合完全重复。原始审计保留失败记录；独立生成 leak-free-v1 清单并验证交集为空，实际训练/验证/测试为 4990/999/4428，完整测试集保留。训练、验证和四种条件的测试缓存均已完成。最新完整回归 16 项通过。T 首个完整 epoch 已完成，loss=0.3784324，validation mIoU=0.8733769，耗时 1237.84 秒。checkpoint 在 runs/formal/T；状态是预定的 epoch 边界停止，不是 20 轮完成。性能优化已验证：同一 checkpoint 的全部 999 张验证图只用 102.868 秒，所有原有指标、混淆矩阵和有效像素总数完全一致。原目录保留为性能 pilot；新的正式系列使用 runs/final，保持全部模型各 20 轮。训练会自动更新本文件顶部和 runs/final/CURRENT_STAGE.json。
-
-正式训练预算为 T 与 S0～S3 各 20 个完整 epoch、seed 42；正式学生保持相同初始化和训练协议。先完成 T 的首轮计时，再恢复完整预算。验证集小范围校准单独记录，不使用测试集调参。
+当前日志：artifacts/final_pipeline_retry.stdout.log / stderr.log。若再次异常，检查 artifacts/kd_production_failure.json 与 kd_production_failure_batch.pt。禁止在没有证据时将重试称为根因修复。
 
 ## 下一步
 
-1. 以本文件顶部自动进度、runs/final/CURRENT_STAGE.json 和实际进程为准；不重复启动已经在运行的流水线。
-2. 当前正式预算 T、S0～S3 各 20 轮；验证集校准为四个独立候选各 3 轮。日志在 artifacts/final_pipeline.stdout.log 与 stderr.log。
-3. 完成 S0/S1/S2/S3、鲁棒性、正式 ONNX、报告图表和模型包。
-4. 上传工作分支，核对远端，再从新检出目录运行 CPU 快速验证。
+1. 完成蒸馏校准，继续 S1、S2、S3 各 20 轮。全部学生的主干初始化、数据、预算及选模协议保持一致。
+2. 全部五组在 4428 张测试图上完成干净/亮度/模糊/JPEG 评价；最终学生只按验证集选择。
+3. 完成最终学生 256/384/512 与 S0 384 导出、案例图、演示和报告；模型包通过内容与 SHA 核验后上传仅协作者可访问的草稿 Release。
+4. 正常提交并核对远端，在新的检出目录运行 CPU 验证。
 
-## 本机位置
+## 运行位置与命令
 
-工程解释器 F:/PyLibs/cv_cw2_lib/Scripts/python.exe；干净 CPU 解释器 F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。
-数据 F:/Datasets/computer_vision/Trans10K；训练缓存 F:/Datasets/computer_vision/Trans10K_train_clean384，验证缓存 F:/Datasets/computer_vision/Trans10K_val_clean384，测试缓存 F:/Datasets/computer_vision/Trans10K_test384。实际清单 data/clean_manifests。
-权重缓存 F:/Models/computer_vision/cw2。训练时设置 TORCH_HOME 与 HF_HOME 到该目录，避免写 C 盘缓存。
-合成结果 runs/smoke、artifacts/student_smoke.onnx、artifacts/smoke_demo。
+GPU Python：F:/PyLibs/cv_cw2_lib/Scripts/python.exe。独立 CPU Python：F:/PyLibs/cv_cw2_clean_lib/Scripts/python.exe。
+原始数据 F:/Datasets/computer_vision/Trans10K。缓存分别为 Trans10K_train_clean384、Trans10K_val_clean384、Trans10K_test384。实际清单 data/clean_manifests。
+权重缓存通过 TORCH_HOME=F:/Models/computer_vision/cw2/torch、HF_HOME=F:/Models/computer_vision/cw2/huggingface 指定；已有权重时设置 HF_HUB_OFFLINE=1。
 
-## 仍待真实条件
+```powershell
+python project.py pipeline --root F:/Datasets/computer_vision/Trans10K --manifests data/clean_manifests --cache F:/Datasets/computer_vision/Trans10K_train_clean384 --validation-cache F:/Datasets/computer_vision/Trans10K_val_clean384 --test-cache F:/Datasets/computer_vision/Trans10K_test384 --out runs/final --device cuda --calibrate
+```
 
-GitHub 正确账号已登录；工作分支已上传并核对远端提交 7b694c31cbf16f02f1d91d2bf475b80b44b524d0。首次远端干净检出发现测试输出父目录缺失，已修复并复验通过 14 项；此后本地几何与缓存新增检查达到 15 项通过。
+恢复前先检查进程，不能重复启动。完成的实验按身份校验后复用；未完成实验只能从已保存 epoch 边界恢复。若失败发生在第一个 epoch 且无 last.pt，先保留失败目录，不能假装存在可恢复 checkpoint。训练核心源码、配置或清单身份变化须用新目录，不绕过身份核对。
 
-未提供真实 Nano；板端 API、引擎、速度、温度、功耗、摄像头和现场录制仍待实机验证。仓库公开，不能创建私有 Release；正式模型包完成后再处理私有组内存储，不把大文件硬塞 Git。
+runs/formal/T 是一个 epoch 的性能 pilot，runs/smoke 是合成功能验证，两者不属于正式系列。原图评价优化已在完整 999 张验证图上核实所有指标、混淆矩阵、有效像素与旧实现完全一致，证据 results/optimized_validation_equivalence.json。
 
-## 恢复规则
+## 外部条件与交付边界
 
-先读本文件、docs/VALIDATION.md、docs/work_state.json，再查 Git 状态与活动进程。不要重建工程。训练源码、配置、清单身份变化须使用新 run 目录，不能覆盖已有实验。不得把仍在执行的正式训练写成已完成。
+GitHub 认证、GPU 和数据已解决。缺少真实原版 Nano 连接及现场物件/摄像头，板端速度、温度、功耗、实拍和最终录像仍需组员完成；不能用 PC 或回放代替。
+
+源码和小型结果已上传；正式模型包尚未生成、上传。目标仓库公开，采用草稿 Release 组内交付，先用非敏感清单核实匿名拒绝，再上传并核对模型摘要。不能将草稿发布为公开 Release。具体接手步骤见 HANDOFF.md。

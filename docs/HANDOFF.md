@@ -8,9 +8,9 @@
 
 真实数据：官方 train/validation/test 全部下载、CRC 校验并解压，逐张审计完成。18 个训练标签方向异常已显式修正；11 组源数据跨集合重复保留在原始失败报告中。实际实验使用独立验收通过的 leak-free-v1 清单 4990/999/4428，全部测试图保留。
 
-正式训练：正式系列为 runs/final；当前阶段见 PROGRESS 顶部自动状态。runs/formal/T 是已完成一轮的真实性能 pilot，不能当成 20 轮完成。runs/smoke 仅为合成样本功能验证。正式 checkpoint、日志和结果将在完成后写入本文件。
+正式训练：runs/final 中 T、S0 各完成 20 轮，最佳验证 mIoU 分别为 0.9239955207704398、0.8775038527093654。checkpoint 和 epochs.jsonl 在各自目录，小型回执在 results。两项边界校准各完成 3 轮；蒸馏校准因非有限损失曾停止，失败记录已保留，2026-11-05 08:05 按原配置重新运行并捕获异常现场。S1、S2、S3 及全部最终测试尚未完成，最新阶段以 PROGRESS 顶部为准。runs/formal/T 是性能 pilot，runs/smoke 是合成功能验证。
 
-模型导出：合成样本学生已经完成 PyTorch/ONNX Runtime 对齐，不能作为真实透明物体模型。正式模型导出 pending。
+模型导出：真实 S0 的 runs/final/exports/S0_384.onnx 已通过 PyTorch/ONNX Runtime 对齐，最大绝对误差小于 4.08e-5、三组掩膜一致率 1.0。验证图片和九秒静态图回放已跑通；最终学生和完整模型包仍待正式实验结束。
 
 Nano：环境检查、引擎构建、FP32/FP16 runner、对齐检查、视频/摄像头、计时/资源采集和十分钟矩阵脚本已实现；没有真实板卡连接，硬件验证 pending。
 
