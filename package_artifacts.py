@@ -54,6 +54,8 @@ def package(runs, output, manifests=None):
             if filename.startswith('test_') and json.loads((runs / name / filename).read_text())['manifest_sha256'] != manifest_hashes['test']:
                 raise ValueError('Test manifest provenance mismatch')
             shutil.copy2(runs / name / filename, log_dir / filename)
+        if name == 'T' and (runs / name / 'teacher_reuse.json').exists():
+            shutil.copy2(runs / name / 'teacher_reuse.json', log_dir / 'teacher_reuse.json')
     (output / 'manifests').mkdir()
     for filename in ('train.json', 'validation.json', 'test.json', 'audit.json'):
         shutil.copy2(manifests / filename, output / 'manifests' / filename)

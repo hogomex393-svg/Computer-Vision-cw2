@@ -6,7 +6,7 @@ S0: MobileNetV3-Large ImageNet V2, 64-channel pyramid decoder, CE plus foregroun
 
 S1: S0 with boundary auxiliary loss. S2: S0 with output KL distillation. S3: both. Main network initialization is identical for the four students at the same seed; auxiliary parameters are constructed afterward. No multi-level feature distillation is used.
 
-The initial formal budget is 20 complete epochs per model at seed 42, input 384, batch 4. All students share AdamW learning rate 3e-4, weight decay 0.01, cosine schedule, horizontal flip, brightness factor [0.8,1.2], frozen BatchNorm running statistics and gradient clipping at 5. Teacher LR is 6e-5. AMP uses FP16 convolution with FP32 loss reductions. No test-set tuning or silent step truncation is allowed. CPU runs require explicit smoke mode.
+The formal budget is 20 complete epochs per model at seed 42, input 384, batch 4. All students share AdamW learning rate 3e-4, weight decay 0.01, cosine schedule, horizontal flip, brightness factor [0.8,1.2], frozen BatchNorm running statistics and gradient clipping at 5. Teacher LR is 6e-5. The completed teacher used FP16 AMP. After a reproduced student forward overflow, all four students and calibration candidates use BF16 AMP with FP32 loss reductions, and restart in runs/final_bf16. See NUMERICAL_FIX.md. No test-set tuning or silent step truncation is allowed. CPU runs require explicit smoke mode.
 
 The decoder channel count stays 64. Boundary band dilation radius is 1 pixel at training resolution, invalid neighbors excluded. Initial lambda_boundary=0.2, lambda_kd=0.5, temperature=4. Validation-only calibration candidates and their selected values, if run, are stored under the calibration directory; they must not alter test protocol or main training budgets.
 

@@ -59,7 +59,7 @@
       "requirement_id": "R03",
       "statement": "Training",
       "source": "docs/REQUIREMENTS.md",
-      "status": "current",
+      "status": "superseded",
       "supersedes": [],
       "acceptance": "docs/VALIDATION.md",
       "prohibitions": [
@@ -141,6 +141,21 @@
         "No concealed protocol change"
       ],
       "scope": "coursework2"
+    },
+    {
+      "requirement_id": "R03-rev2",
+      "statement": "Uniform BF16 student training in runs/final_bf16 after reproduced FP16 forward overflow; rerun all students/calibration. Reuse completed teacher with unchanged original provenance.",
+      "source": "docs/NUMERICAL_FIX.md; captured production failure",
+      "status": "current",
+      "supersedes": [
+        "R03"
+      ],
+      "acceptance": "Same-case finite forward/backward; full regression; all student identities and precision match; complete real runs",
+      "prohibitions": [
+        "No mixed precision protocols in student comparison",
+        "No relabeling original teacher provenance"
+      ],
+      "scope": "coursework2"
     }
   ],
   "checkpoints": [
@@ -206,6 +221,32 @@
       ],
       "next_action": "Observe same-code production retry with exception-only tensor capture; finish calibration and S1/S2/S3",
       "created_at": "2026-11-05T08:05:28+08:00"
+    },
+    {
+      "revision": 6,
+      "item_id": "W03",
+      "state": "Same-code KD production retry completed epoch 1 and validation; epoch 2 running; updated code pushed and remote verified",
+      "evidence": [
+        "runs/final/calibration/kd_T2_W025/epochs.jsonl",
+        "runs/final/calibration/kd_T2_W025/last.pt",
+        "artifacts/final_pipeline_retry.stdout.log",
+        "305bf144d9a31e216d5ea4608a146504bbe20727"
+      ],
+      "next_action": "Let the sequential pipeline continue; if it exits, inspect the captured failure before retrying; do not launch a second writer",
+      "created_at": "2026-11-05T08:10:23+08:00"
+    },
+    {
+      "revision": 7,
+      "item_id": "W03",
+      "state": "FP16 forward overflow reproduced; BF16 counterexample passed; complete CPU regression 27 passed; preparing new controlled student series",
+      "evidence": [
+        "results/fp16_overflow_diagnosis.json",
+        "results/bf16_failure_replay.json",
+        "artifacts/pytest_bf16_cpu.xml",
+        "docs/NUMERICAL_FIX.md"
+      ],
+      "next_action": "Freeze corrected source and run full BF16 series with verified reused teacher",
+      "created_at": "2026-11-05"
     }
   ],
   "gates": {

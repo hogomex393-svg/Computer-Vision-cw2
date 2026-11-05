@@ -29,5 +29,6 @@
     0.224,
     0.225
   ],
-  "experiment": "S2"
+  "experiment": "S2",
+  "amp_dtype": "bfloat16"
 }

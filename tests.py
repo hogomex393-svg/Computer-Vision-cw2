@@ -442,3 +442,50 @@ def test_release_bundle_includes_manifests_and_rejects_tampering(tmp_path):
     make_archive(extra=True)
     with pytest.raises(ValueError, match='Unexpected archive entries'):
         validate_bundle(archive)
+
+
+def test_precision_configuration_and_mixed_report_refusal(tmp_path):
+    from learning import amp_settings
+    from report import summarize
+    assert amp_settings({'amp': True, 'amp_dtype': 'bfloat16'}, 'cpu') == (False, torch.bfloat16, False)
+    with pytest.raises(ValueError, match='amp_dtype'):
+        amp_settings({'amp': True, 'amp_dtype': 'unknown'}, 'cpu')
+    for name, dtype in [('S0', 'float16'), ('S1', 'bfloat16')]:
+        folder = tmp_path / name
+        folder.mkdir()
+        config = dict(smoke_config(), amp_dtype=dtype)
+        run = {'status': 'completed', 'identity': name, 'smoke': False, 'config': config,
+               'provenance': {'sources': {'models.py': 'same'}, 'manifests': {'train.json': 'same'}}}
+        (folder / 'run.json').write_text(json.dumps(run))
+    with pytest.raises(ValueError, match='experimental protocol'):
+        summarize(tmp_path, tmp_path / 'report')
+
+
+def test_teacher_reuse_preserves_identity_and_refuses_changed_data(tmp_path):
+    import hashlib
+    from project import reuse_teacher
+    source, target, manifests = [tmp_path / name for name in ('source', 'target', 'manifests')]
+    source.mkdir()
+    manifests.mkdir()
+    config = {'kind': 'teacher', 'epochs': 1}
+    for split in ('train', 'validation'):
+        (manifests / (split + '.json')).write_text(json.dumps({'split': split}))
+    hashes = {p.name: sha256(p) for p in manifests.iterdir()}
+    provenance = {'config': config, 'sources': {'learning.py': 'original'}, 'manifests': hashes}
+    identity = hashlib.sha256(json.dumps(provenance, sort_keys=True).encode()).hexdigest()
+    run = {'status': 'completed', 'smoke': False, 'config': config, 'provenance': provenance,
+           'identity': identity, 'last_completed_epoch': 1, 'git_commit_at_start': 'a' * 40}
+    (source / 'run.json').write_text(json.dumps(run))
+    (source / 'epochs.jsonl').write_text(json.dumps({'epoch': 1}) + '\n')
+    validation = {'miou': 0.8}
+    (source / 'best_validation.json').write_text(json.dumps(validation))
+    for name in ('best', 'last'):
+        torch.save({'identity': identity, 'config': config, 'smoke': False, 'epoch': 1,
+                    'validation_manifest_sha256': hashes['validation.json'], 'validation': validation}, source / (name + '.pt'))
+    assert reuse_teacher(source, target, manifests, config) == run
+    assert reuse_teacher(source, target, manifests, config) == run
+    assert sha256(source / 'run.json') == sha256(target / 'run.json')
+    (manifests / 'train.json').write_text('changed')
+    with pytest.raises(ValueError, match='data manifests differ'):
+        reuse_teacher(source, target, manifests, config)
+    assert json.loads((target / 'run.json').read_text()) == run

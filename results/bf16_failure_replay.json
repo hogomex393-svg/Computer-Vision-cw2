@@ -1,0 +1,8 @@
+{
+  "bf16_supported": true,
+  "forward_finite": true,
+  "teacher_finite": true,
+  "loss": 3.0291547775268555,
+  "all_gradients_finite": true,
+  "teacher_no_grad": true
+}

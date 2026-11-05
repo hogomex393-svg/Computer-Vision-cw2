@@ -1,0 +1,30 @@
+{
+  "first_nonfinite_module": "encoder.16.0",
+  "values": {
+    "fp16": {
+      "type": "Conv2d",
+      "shape": [
+        4,
+        960,
+        12,
+        12
+      ],
+      "finite": false,
+      "max_abs": 65024.0
+    },
+    "fp32": {
+      "type": "Conv2d",
+      "shape": [
+        4,
+        960,
+        12,
+        12
+      ],
+      "finite": true,
+      "max_abs": 67143.6796875
+    }
+  },
+  "production_batch": 436,
+  "failed_trial": "kd_T4_W05",
+  "fp16_max_finite": 65504
+}

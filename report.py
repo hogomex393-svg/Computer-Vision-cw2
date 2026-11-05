@@ -20,8 +20,10 @@ def summarize(root, output):
         dataset_identities.add(json.dumps(run['provenance']['manifests'], sort_keys=True))
         if name != 'T':
             fingerprints.add(json.dumps(run['provenance']['sources'], sort_keys=True))
-            protocols.add(json.dumps({key: run['config'][key] for key in (
-                'size', 'batch_size', 'epochs', 'seed', 'augment', 'learning_rate', 'weight_decay', 'freeze_bn', 'decoder_channels')}, sort_keys=True))
+            protocol = {key: run['config'][key] for key in (
+                'size', 'batch_size', 'epochs', 'seed', 'augment', 'learning_rate', 'weight_decay', 'freeze_bn', 'decoder_channels', 'amp')}
+            protocol['amp_dtype'] = run['config'].get('amp_dtype', 'float16')
+            protocols.add(json.dumps(protocol, sort_keys=True))
         for condition in ('clean', 'brightness', 'blur', 'jpeg'):
             path = directory / ('test_' + condition + '.json')
             if path.exists():

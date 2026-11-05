@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -112,6 +113,49 @@ def environment(out):
     return record
 
 
+def reuse_teacher(source, destination, manifests, expected_config):
+    from data import sha256
+    from learning import load_checkpoint, write_json
+    source, destination, manifests = Path(source), Path(destination), Path(manifests)
+    if source.resolve() == destination.resolve():
+        raise ValueError('Teacher source and destination must be different')
+    run = config_file(source / 'run.json')
+    if (run['status'] != 'completed' or run['smoke'] or run['config'] != expected_config or
+            run['config']['kind'] != 'teacher' or run['last_completed_epoch'] != expected_config['epochs']):
+        raise ValueError('Only a complete, matching formal teacher can be reused')
+    digest = hashlib.sha256(json.dumps(run['provenance'], sort_keys=True).encode()).hexdigest()
+    if digest != run['identity'] or run['provenance']['config'] != expected_config:
+        raise ValueError('Teacher provenance identity differs')
+    for split in ('train', 'validation'):
+        if run['provenance']['manifests'][split + '.json'] != sha256(manifests / (split + '.json')):
+            raise ValueError('Teacher data manifests differ')
+    for name in ('best', 'last'):
+        checkpoint = load_checkpoint(source / (name + '.pt'))
+        if (checkpoint['identity'] != run['identity'] or checkpoint['config'] != expected_config or checkpoint['smoke'] or
+                checkpoint['validation_manifest_sha256'] != run['provenance']['manifests']['validation.json'] or
+                (name == 'last' and checkpoint['epoch'] != expected_config['epochs']) or
+                (name == 'best' and checkpoint['validation'] != config_file(source / 'best_validation.json'))):
+            raise ValueError('Teacher checkpoint provenance differs')
+        del checkpoint
+    names = ('run.json', 'epochs.jsonl', 'best_validation.json', 'best.pt', 'last.pt')
+    hashes = {name: sha256(source / name) for name in names}
+    receipt = {'run_identity': run['identity'], 'original_code_sources': run['provenance']['sources'],
+               'original_commit': run['git_commit_at_start'], 'files': hashes,
+               'rule': 'Reuse a completed teacher without changing its original config, identity, checkpoints or training records'}
+    existing = destination / 'teacher_reuse.json'
+    if destination.exists() and any(destination.iterdir()):
+        if not existing.exists() or config_file(existing) != receipt:
+            raise ValueError('Destination is not the same verified teacher import')
+    else:
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            shutil.copy2(source / name, destination / name)
+        write_json(existing, receipt)
+    if any(sha256(destination / name) != value for name, value in hashes.items()):
+        raise ValueError('Copied teacher files differ')
+    return run
+
+
 def pipeline(args):
     from learning import write_json, record_progress
     try:
@@ -143,6 +187,11 @@ def run_pipeline(args):
             record_progress(out, '验证集参数校准')
             calibrate(args, out, device)
         config = config_file(Path(args.config_dir) / (name + '.json'))
+        if name == 'T' and args.teacher_run:
+            record_progress(out, '核对并复用已完成教师，保留原训练身份')
+            reuse_teacher(args.teacher_run, out / 'T', args.manifests, config)
+            write_json(out / 'effective_configs/T.json', config)
+            continue
         if name in ('S1', 'S2', 'S3') and (out / 'calibration/selection.json').exists():
             selected = config_file(out / 'calibration/selection.json')
             config.update(selected['parameters'])
@@ -327,6 +376,7 @@ def main():
     suite.add_argument('--validation-cache')
     suite.add_argument('--test-cache')
     suite.add_argument('--calibrate', action='store_true')
+    suite.add_argument('--teacher-run', help='Reuse a complete teacher with matching config/data and preserved provenance')
     args = parser.parse_args()
     if args.command == 'env':
         result = environment(args.out)

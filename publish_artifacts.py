@@ -44,6 +44,8 @@ def validate_bundle(archive):
         expected.update('manifests/' + name for name in ('train.json', 'validation.json', 'test.json', 'audit.json'))
         expected.update('checkpoints/' + name + '.pt' for name in experiments)
         expected.update('results/' + name + '/' + filename for name in experiments for filename in result_files)
+        if 'results/T/teacher_reuse.json' in names:
+            expected.add('results/T/teacher_reuse.json')
         export_pairs = {(recipe['selected'], size) for size in (256, 384, 512)} | {('S0', 384)}
         expected.update('models/{}_{}{}'.format(name, size, suffix)
                         for name, size in export_pairs for suffix in ('.onnx', '.json', '.reference.npz'))

@@ -70,7 +70,7 @@ def record_progress(run_root, stage, document=None):
         if begin in original and end in original:
             before, _, rest = original.partition(begin)
             _, _, after = rest.partition(end)
-            updated = before + generated + after
+            updated = before + generated + after.lstrip('\r\n')
         else:
             updated = generated + '\n' + original
         temporary = document.with_suffix('.md.tmp')
@@ -147,6 +147,16 @@ def renormalize(image, source, target):
     return (image * source_std + source_mean - target_mean) / target_std
 
 
+def amp_settings(config, device):
+    name = config.get('amp_dtype', 'float16')
+    if name not in ('float16', 'bfloat16'):
+        raise ValueError('amp_dtype must be float16 or bfloat16')
+    enabled = config['amp'] and device.startswith('cuda')
+    if enabled and name == 'bfloat16' and not torch.cuda.is_bf16_supported():
+        raise ValueError('This CUDA device does not support the configured bfloat16 training')
+    return enabled, getattr(torch, name), enabled and name == 'float16'
+
+
 def train(config, root, manifests, out, device='auto', resume=False, teacher_path=None, baseline_path=None,
           stop_after_epoch=0, max_train_steps=0, cache=None, validation_cache=None):
     Path(out).mkdir(parents=True, exist_ok=True)
@@ -205,8 +215,8 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
         batch = 4 if device.startswith('cuda') and torch.cuda.get_device_properties(device).total_memory >= 7 * 1024 ** 3 else 2
     optimizer = torch.optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config['epochs'])
-    use_amp = config['amp'] and device.startswith('cuda')
-    scaler = torch.amp.GradScaler('cuda', enabled=use_amp)
+    use_amp, amp_dtype, use_scaler = amp_settings(config, device)
+    scaler = torch.amp.GradScaler('cuda', enabled=use_scaler)
     epoch_start, step, best = 0, 0, -1.0
     if resume:
         checkpoint = load_checkpoint(out / 'last.pt')
@@ -249,7 +259,7 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
             for index, (image, mask) in enumerate(loader):
                 image, mask = image.to(device), mask.to(device)
                 optimizer.zero_grad(set_to_none=True)
-                with torch.autocast(device_type='cuda', dtype=torch.float16) if use_amp else nullcontext():
+                with torch.autocast(device_type='cuda', dtype=amp_dtype) if use_amp else nullcontext():
                     output = model(image)
                     loss = segmentation_loss(output['logits'], mask)
                     if config['boundary']:
@@ -262,7 +272,7 @@ def _train(config, root, manifests, out, device='auto', resume=False, teacher_pa
                     raise FloatingPointError('Nonfinite training loss')
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0, error_if_nonfinite=not use_scaler)
                 scaler.step(optimizer)
                 scaler.update()
                 losses.append(loss.item())
