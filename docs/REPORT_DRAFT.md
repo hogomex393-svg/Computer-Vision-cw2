@@ -55,3 +55,37 @@ Host regressions cover masks, coordinates, manually computable metrics, degenera
 RGB alone cannot fully disambiguate every transparent surface; mirrors, thin edges, clutter and severe reflections can fail. The teacher is heavier than the deployment student. Edge constraints, board thermal state and scene domain shift must be measured. This report must distinguish implemented code, real-data model quality and physical-board validation.
 
 References: [TransLAB/Trans10K](https://xieenze.github.io/projects/TransLAB/TransLAB.html), [Trans2Seg](https://github.com/xieenze/Trans2Seg), [SegFormer](https://github.com/NVlabs/SegFormer), [MobileNetV3 implementation](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.mobilenet_v3_large.html), [TransCues](https://arxiv.org/abs/2512.07034). Detailed source/version decisions are in docs/SOURCES.md.
+
+<!-- ACTUAL_DELIVERY_BEGIN -->
+## Completed host experiments
+
+Protocol: Trans10K v1 leak-free-v1, 4990/999/4428. All models completed 20 epochs. All students used BF16 AMP.
+The frozen teacher retains its original FP16 training provenance. Deployment selection used validation only: S1.
+
+T: validation mIoU 0.923996; test mIoU 0.923477; foreground IoU 0.902576; foreground Dice 0.948793; boundary F1 0.189402.
+Class IoUs: [0.9612477674578767, 0.9196160455433621, 0.88956717221612]. Brightness/blur/JPEG mIoU: 0.922754/0.923968/0.922368.
+
+S0: validation mIoU 0.872828; test mIoU 0.874782; foreground IoU 0.844392; foreground Dice 0.915632; boundary F1 0.135174.
+Class IoUs: [0.9363703056413125, 0.8634865929381734, 0.8244903670018596]. Brightness/blur/JPEG mIoU: 0.868579/0.875359/0.872495.
+
+S1: validation mIoU 0.884096; test mIoU 0.875862; foreground IoU 0.844761; foreground Dice 0.915849; boundary F1 0.137728.
+Class IoUs: [0.9372283635746143, 0.8661927710885576, 0.8241640776117325]. Brightness/blur/JPEG mIoU: 0.868105/0.877567/0.874660.
+
+S2: validation mIoU 0.877203; test mIoU 0.874738; foreground IoU 0.845511; foreground Dice 0.916289; boundary F1 0.135518.
+Class IoUs: [0.9368994791880686, 0.8614446706174081, 0.825870388307889]. Brightness/blur/JPEG mIoU: 0.868511/0.875351/0.871428.
+
+S3: validation mIoU 0.881062; test mIoU 0.876888; foreground IoU 0.847741; foreground Dice 0.917597; boundary F1 0.137930.
+Class IoUs: [0.9378685224207107, 0.8654749815989293, 0.8273197512540852]. Brightness/blur/JPEG mIoU: 0.871893/0.876908/0.875535.
+
+S1 versus S0: clean-test mIoU change +0.1079 percentage points; boundary-F1 change +0.2554 percentage points.
+S2 versus S0: clean-test mIoU change -0.0044 percentage points; boundary-F1 change +0.0344 percentage points.
+S3 versus S0: clean-test mIoU change +0.2105 percentage points; boundary-F1 change +0.2756 percentage points.
+
+Negative changes are retained. This single-seed comparison does not establish statistical significance.
+Figures in results/final are generated from actual logs. The four image columns are original / ground truth / S0 / selected student.
+JPEG figure copies are display-sized previews; all metrics use original-resolution labels.
+Nano latency, power, temperatures and live camera quality remain pending physical hardware.
+
+![Measured accuracy and robustness](../results/final/metrics.png)
+![Actual learning curves](../results/final/learning_curves.png)
+<!-- ACTUAL_DELIVERY_END -->

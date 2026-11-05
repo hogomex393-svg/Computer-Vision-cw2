@@ -29,3 +29,12 @@ Actual completion, checkpoints and measured metrics are listed in docs/PROGRESS.
 The official source index is 5000/1000/4428. Full decoded-image auditing found 11 cross-split duplicate groups. Actual T/S0/S1/S2/S3 runs use the explicit leak-free-v1 derived index: 4990 train, 999 validation, 4428 test. All original test images remain; ten train and one validation examples are excluded from experiment manifests only. Eighteen training mask rotations are SHA-bound and documented in DATA_AUDIT.md. Raw data and source audit remain intact. This is a disclosed data-integrity adaptation, not an unchanged-original-protocol benchmark.
 
 Image decoding uses the raw stored pixel grid consistently: Pillow loading and OpenCV image demo both ignore automatic EXIF orientation. Known training-mask rotations are applied explicitly from the audited manifest.
+
+<!-- ACTUAL_DELIVERY_BEGIN -->
+## Completed host experiments
+
+Protocol: Trans10K v1 leak-free-v1, 4990/999/4428. All models completed 20 epochs. All students used BF16 AMP.
+The frozen teacher retains its original FP16 training provenance. Deployment selection used validation only: S1.
+
+Full measured metrics: ../results/final/RESULTS.md.
+<!-- ACTUAL_DELIVERY_END -->

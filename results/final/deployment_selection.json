@@ -1,0 +1,4 @@
+{
+  "selected": "S1",
+  "rule": "highest validation mIoU; no test-based selection"
+}

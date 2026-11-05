@@ -1,0 +1,52 @@
+{
+  "source": {
+    "teacher": "14f196b5a84a08217c5cab1ee60054da2d8f18558003942022505ab8b78a1d36",
+    "baseline_validation": "1ea33b67974845083396f91122d193ac45d98b3e2ae49bf9621e5a8299add74d"
+  },
+  "trials": [
+    {
+      "name": "boundary_01",
+      "family": "S1",
+      "parameters": {
+        "lambda_boundary": 0.1
+      },
+      "validation_miou": 0.8228079741063726,
+      "identity": "96d2abf8ba3ed0f44c6641d06cdb512d9eb4a3129bd55879c7123ecfb8f0f265"
+    },
+    {
+      "name": "boundary_02",
+      "family": "S1",
+      "parameters": {
+        "lambda_boundary": 0.2
+      },
+      "validation_miou": 0.825076673163064,
+      "identity": "44ad4bd812120c6e3dd2bbc3362c76fcd64b71fdc9df4920edeb9da8fef52a50"
+    },
+    {
+      "name": "kd_T2_W025",
+      "family": "S2",
+      "parameters": {
+        "temperature": 2.0,
+        "lambda_kd": 0.25
+      },
+      "validation_miou": 0.8211884725009821,
+      "identity": "b04b1dfa52932f7ef622358bac24235c9a58a261562729f98d607e115f7d412d"
+    },
+    {
+      "name": "kd_T4_W05",
+      "family": "S2",
+      "parameters": {
+        "temperature": 4.0,
+        "lambda_kd": 0.5
+      },
+      "validation_miou": 0.8183123641240058,
+      "identity": "e11e262cb22d36c616dde7e6547dd0648ecee3abcdfdbc421b590acf51bc1796"
+    }
+  ],
+  "parameters": {
+    "lambda_boundary": 0.2,
+    "temperature": 2.0,
+    "lambda_kd": 0.25
+  },
+  "rule": "three full epochs per candidate; validation mIoU only; no test evaluation"
+}

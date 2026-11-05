@@ -1,0 +1,58 @@
+{
+  "fixed_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "failure_indices": [
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "failure_rule": "lowest per-image mIoU from the complete clean test, tie by original manifest index",
+  "columns": [
+    "original",
+    "ground_truth",
+    "S0",
+    "final"
+  ],
+  "smoke": false,
+  "full_test_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    752,
+    3844,
+    3662,
+    3971,
+    4339,
+    4401
+  ],
+  "fixed_global_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "failure_global_indices": [
+    752,
+    3844,
+    3662,
+    3971,
+    4339,
+    4401
+  ],
+  "final_model": "S1",
+  "source_manifest_sha256": "0c001fdadd9d4726b2db8c6f07a1ca507ad9b6be732764bd16661b177ed56fe1"
+}

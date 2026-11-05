@@ -1,0 +1,95 @@
+{
+  "identity": "a333b416647e9bc2e3cf9bf271f9daf3c6ddb021e46e34cee51164c86f8dd8c1",
+  "status": "completed",
+  "smoke": false,
+  "config": {
+    "kind": "student",
+    "decoder_channels": 64,
+    "boundary": false,
+    "distill": true,
+    "pretrained": true,
+    "size": 384,
+    "batch_size": 4,
+    "epochs": 20,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.01,
+    "seed": 42,
+    "amp": true,
+    "augment": true,
+    "freeze_bn": true,
+    "lambda_boundary": 0.2,
+    "lambda_kd": 0.25,
+    "temperature": 2.0,
+    "boundary_radius": 1,
+    "boundary_tolerance": 2,
+    "smoke": false,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "experiment": "S2",
+    "amp_dtype": "bfloat16"
+  },
+  "batch_size": 4,
+  "device": "cuda",
+  "provenance": {
+    "config": {
+      "kind": "student",
+      "decoder_channels": 64,
+      "boundary": false,
+      "distill": true,
+      "pretrained": true,
+      "size": 384,
+      "batch_size": 4,
+      "epochs": 20,
+      "learning_rate": 0.0003,
+      "weight_decay": 0.01,
+      "seed": 42,
+      "amp": true,
+      "augment": true,
+      "freeze_bn": true,
+      "lambda_boundary": 0.2,
+      "lambda_kd": 0.25,
+      "temperature": 2.0,
+      "boundary_radius": 1,
+      "boundary_tolerance": 2,
+      "smoke": false,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "experiment": "S2",
+      "amp_dtype": "bfloat16"
+    },
+    "sources": {
+      "data.py": "196f10d011419db82be58a9315c2d815f284f048ecf1087d05bcfd2f5d10364a",
+      "models.py": "ae4f8aea835d80ee97faa9913460001e98c95454473eda9fbd5f24e8a750f10f",
+      "metrics.py": "386d82e42a99b50bb8797eac348ddc740de6b2c2d8ae640461b5dcf2b8b3bfc4",
+      "learning.py": "b9b0f2c427c3fdd9fcbcb2de3783c0f89bb37d7d9d2484582e30d77bc4639dff",
+      "runtime.py": "0b9f3bf00a62a38dade8553ebb8d4455325982b9c772ed56df31fa69a5055183"
+    },
+    "manifests": {
+      "train.json": "4a5798a58dc4ac65aa7924e2412bb72020ce429522df59a8a34db6d516ee3d88",
+      "validation.json": "de10378815f66456a1cc90ac39f32f134d2974749b85390cf731dbe518c8038f"
+    }
+  },
+  "pid": 35744,
+  "last_completed_epoch": 20,
+  "global_step": 24960,
+  "best_miou": 0.8772028673548271,
+  "git_commit_at_start": "cc3fdddcbf7e10673b15cfb03641e0bb244996ed",
+  "elapsed_seconds": 4505.920990199986,
+  "peak_cuda_bytes": 1763425792
+}
